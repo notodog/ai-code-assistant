@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Copilot Code Saver",
+  "version": "0.3.1",
+  "description": "Save code blocks directly to your project files",
+  "permissions": ["activeTab", "storage", "nativeMessaging"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://copilotstudio.microsoft.com/*",
+        "https://*.powerva.microsoft.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "com.ccs.host",
+  "description": "Copilot Code Saver Native Host",
+  "path": "/home/xzhou/.local/bin/ccs-host",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://YOUR_EXTENSION_ID/"
+  ]
+}

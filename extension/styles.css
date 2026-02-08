@@ -1,0 +1,109 @@
+.ccs-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.ccs-modal {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.ccs-modal h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.ccs-modal label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.ccs-modal input,
+.ccs-modal select {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.ccs-modal input:focus,
+.ccs-modal select:focus {
+  outline: none;
+  border-color: #0078d4;
+}
+
+.ccs-detected {
+  background: #e7f3ff;
+  border: 1px solid #0078d4;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #0078d4;
+}
+
+.ccs-preview {
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 10px;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  color: #333;
+  word-break: break-all;
+  margin-bottom: 12px;
+}
+
+.ccs-modal-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.ccs-modal-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ccs-modal-btn.primary {
+  background: #0078d4;
+  color: white;
+}
+
+.ccs-modal-btn.primary:hover {
+  background: #106ebe;
+}
+
+.ccs-modal-btn.secondary {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.ccs-modal-btn.secondary:hover {
+  background: #e0e0e0;
+}
