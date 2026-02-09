@@ -1,0 +1,1085 @@
+<!-- test/content-test.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Content.js Test Harness</title>
+  <style>
+    * { box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    
+    h1 { color: #333; }
+    h2 { color: #555; margin-top: 40px; border-bottom: 2px solid #0078d4; padding-bottom: 8px; }
+    h3 { color: #666; margin-top: 24px; }
+    
+    .test-case {
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .test-case h4 {
+      margin: 0 0 8px 0;
+      color: #333;
+    }
+    
+    .expected {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 12px;
+    }
+    
+    .expected code {
+      background: #e7f3ff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #0078d4;
+    }
+    
+    pre {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 16px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 0;
+      position: relative;
+    }
+    
+    pre code {
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 13px;
+    }
+    
+    /* Modal styles (copied from styles.css) */
+    .ccs-modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100000;
+    }
+    
+    .ccs-modal {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      width: 400px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    }
+    
+    .ccs-modal h3 {
+      margin: 0 0 16px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+    
+    .ccs-modal label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: #666;
+      margin-bottom: 4px;
+    }
+    
+    .ccs-modal input,
+    .ccs-modal select {
+      width: 100%;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+    
+    .ccs-modal input:focus,
+    .ccs-modal select:focus {
+      outline: none;
+      border-color: #0078d4;
+    }
+    
+    .ccs-detected {
+      background: #e7f3ff;
+      border: 1px solid #0078d4;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #0078d4;
+    }
+    
+    .ccs-preview {
+      background: #f5f5f5;
+      border-radius: 6px;
+      padding: 10px;
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 12px;
+      color: #333;
+      word-break: break-all;
+      margin-bottom: 12px;
+    }
+    
+    .ccs-modal-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    
+    .ccs-modal-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .ccs-modal-btn.primary {
+      background: #0078d4;
+      color: white;
+    }
+    
+    .ccs-modal-btn.primary:hover {
+      background: #106ebe;
+    }
+    
+    .ccs-modal-btn.secondary {
+      background: #f0f0f0;
+      color: #333;
+    }
+    
+    .ccs-modal-btn.secondary:hover {
+      background: #e0e0e0;
+    }
+    
+    .ccs-confidence {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-left: 8px;
+    }
+    
+    .ccs-confidence-high { background: #d4edda; color: #155724; }
+    .ccs-confidence-medium { background: #fff3cd; color: #856404; }
+    .ccs-confidence-low { background: #f8d7da; color: #721c24; }
+    
+    /* Test results panel */
+    #test-results {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 320px;
+      max-height: 80vh;
+      overflow-y: auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      padding: 16px;
+      font-size: 12px;
+    }
+    
+    #test-results h3 {
+      margin: 0 0 12px 0;
+      color: #333;
+    }
+    
+    .result-item {
+      padding: 8px;
+      margin: 4px 0;
+      border-radius: 4px;
+      border-left: 3px solid #ddd;
+    }
+    
+    .result-item.pass { border-left-color: #28a745; background: #f0fff4; }
+    .result-item.fail { border-left-color: #dc3545; background: #fff5f5; }
+    
+    .result-item .filename { font-weight: 600; color: #333; }
+    .result-item .meta { color: #666; font-size: 11px; }
+    
+    #run-tests {
+      width: 100%;
+      padding: 10px;
+      background: #0078d4;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      margin-bottom: 12px;
+    }
+    
+    #run-tests:hover { background: #106ebe; }
+    
+    .summary {
+      padding: 8px;
+      background: #f5f5f5;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Content.js Test Harness</h1>
+  <p>This page tests the <code>FilenameDetector</code> and button injection logic.</p>
+  
+  <div id="test-results">
+    <h3>📊 Test Results</h3>
+    <button id="run-tests">Run All Tests</button>
+    <div class="summary" id="summary">Click "Run All Tests" to start</div>
+    <div id="results-list"></div>
+  </div>
+
+  <!-- ============ STRATEGY 1: Code Block Header ============ -->
+  <h2>Strategy 1: Code Block Header</h2>
+  
+  <div class="test-case" data-expected="src/utils.rs" data-strategy="header">
+    <h4>Header text above code block</h4>
+    <p class="expected">Expected: <code>src/utils.rs</code> (source: header, confidence: high)</p>
+    <div>src/utils.rs</div>
+    <pre><code class="language-rust">pub fn add(a: i32, b: i32) -> i32 {
+    a + b
+}</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="config.json" data-strategy="data-attr">
+    <h4>Data attribute on code element</h4>
+    <p class="expected">Expected: <code>config.json</code> (source: data-attr, confidence: high)</p>
+    <pre><code class="language-json" data-file="config.json">{
+  "name": "test",
+  "version": "1.0.0"
+}</code></pre>
+  </div>
+
+  <!-- ============ STRATEGY 3: First Line Comment ============ -->
+  <h2>Strategy 3: First Line Comment</h2>
+
+  <div class="test-case" data-expected="webhook/WEBHOOK_BEHAVIOR.md" data-strategy="comment">
+    <h4>HTML comment with filepath:</h4>
+    <p class="expected">Expected: <code>webhook/WEBHOOK_BEHAVIOR.md</code> (source: comment, confidence: high)</p>
+    <pre><code class="language-markdown">&lt;!-- filepath: webhook/WEBHOOK_BEHAVIOR.md --&gt;
+# Webhook Behavior
+
+This document describes webhook behavior...</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="src/main.rs" data-strategy="comment">
+    <h4>Rust comment with file:</h4>
+    <p class="expected">Expected: <code>src/main.rs</code> (source: comment, confidence: high)</p>
+    <pre><code class="language-rust">// file: src/main.rs
+fn main() {
+    println!("Hello, world!");
+}</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="utils/helpers.js" data-strategy="comment">
+    <h4>JS comment with filepath:</h4>
+    <p class="expected">Expected: <code>utils/helpers.js</code> (source: comment, confidence: high)</p>
+    <pre><code class="language-javascript">// filepath: utils/helpers.js
+export function formatDate(date) {
+  return date.toISOString();
+}</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="scripts/deploy.sh" data-strategy="comment">
+    <h4>Shell comment with filename:</h4>
+    <p class="expected">Expected: <code>scripts/deploy.sh</code> (source: comment, confidence: high)</p>
+    <pre><code class="language-bash"># filename: scripts/deploy.sh
+#!/bin/bash
+echo "Deploying..."</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="migrations/001_init.sql" data-strategy="comment">
+    <h4>SQL comment with filepath:</h4>
+    <p class="expected">Expected: <code>migrations/001_init.sql</code> (source: comment, confidence: high)</p>
+    <pre><code class="language-sql">-- filepath: migrations/001_init.sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255)
+);</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="src/styles.css" data-strategy="comment">
+    <h4>CSS block comment with file:</h4>
+    <p class="expected">Expected: <code>src/styles.css</code> (source: comment, confidence: high)</p>
+    <pre><code class="language-css">/* file: src/styles.css */
+:root {
+  --primary: #0078d4;
+}</code></pre>
+  </div>
+
+  <!-- ============ STRATEGY 4: Code Structure ============ -->
+  <h2>Strategy 4: Code Structure</h2>
+
+  <div class="test-case" data-expected="main.rs" data-strategy="code-structure">
+    <h4>Rust fn main</h4>
+    <p class="expected">Expected: <code>main.rs</code> (source: code-structure, confidence: high)</p>
+    <pre><code class="language-rust">fn main() {
+    let args: Vec&lt;String&gt; = std::env::args().collect();
+    println!("{:?}", args);
+}</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="lib.rs" data-strategy="code-structure">
+    <h4>Rust #[cfg(test)]</h4>
+    <p class="expected">Expected: <code>lib.rs</code> (source: code-structure, confidence: medium)</p>
+    <pre><code class="language-rust">#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn it_works() {
+        assert_eq!(2 + 2, 4);
+    }
+}</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="main.py" data-strategy="code-structure">
+    <h4>Python if __name__ == "__main__"</h4>
+    <p class="expected">Expected: <code>main.py</code> (source: code-structure, confidence: high)</p>
+    <pre><code class="language-python">def greet(name):
+    return f"Hello, {name}!"
+
+if __name__ == "__main__":
+    print(greet("World"))</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="app.py" data-strategy="code-structure">
+    <h4>Python Flask import</h4>
+    <p class="expected">Expected: <code>app.py</code> (source: code-structure, confidence: medium)</p>
+    <pre><code class="language-python">from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return jsonify({"status": "ok"})</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="main.go" data-strategy="code-structure">
+    <h4>Go package main</h4>
+    <p class="expected">Expected: <code>main.go</code> (source: code-structure, confidence: high)</p>
+    <pre><code class="language-go">package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, Go!")
+}</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="Cargo.toml" data-strategy="code-structure">
+    <h4>TOML [package]</h4>
+    <p class="expected">Expected: <code>Cargo.toml</code> (source: code-structure, confidence: high)</p>
+    <pre><code class="language-toml">[package]
+name = "my-app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = "1.0"</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="package.json" data-strategy="code-structure">
+    <h4>JSON package.json pattern</h4>
+    <p class="expected">Expected: <code>package.json</code> (source: code-structure, confidence: high)</p>
+    <pre><code class="language-json">{
+  "name": "my-project",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "tsc"
+  }
+}</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="tsconfig.json" data-strategy="code-structure">
+    <h4>JSON tsconfig.json pattern</h4>
+    <p class="expected">Expected: <code>tsconfig.json</code> (source: code-structure, confidence: high)</p>
+    <pre><code class="language-json">{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "strict": true
+  }
+}</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="Dockerfile" data-strategy="code-structure">
+    <h4>Dockerfile FROM</h4>
+    <p class="expected">Expected: <code>Dockerfile</code> (source: code-structure, confidence: high)</p>
+    <pre><code class="language-dockerfile">FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+CMD ["node", "index.js"]</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="index.html" data-strategy="code-structure">
+    <h4>HTML DOCTYPE</h4>
+    <p class="expected">Expected: <code>index.html</code> (source: code-structure, confidence: medium)</p>
+    <pre><code class="language-html">&lt;!DOCTYPE html&gt;
+&lt;html lang="en"&gt;
+&lt;head&gt;
+  &lt;meta charset="UTF-8"&gt;
+  &lt;title&gt;Test&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="script.sh" data-strategy="code-structure">
+    <h4>Shell shebang</h4>
+    <p class="expected">Expected: <code>script.sh</code> (source: code-structure, confidence: medium)</p>
+    <pre><code class="language-bash">#!/bin/bash
+set -e
+echo "Running script..."</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="schema.sql" data-strategy="code-structure">
+    <h4>SQL CREATE TABLE</h4>
+    <p class="expected">Expected: <code>schema.sql</code> (source: code-structure, confidence: medium)</p>
+    <pre><code class="language-sql">CREATE TABLE products (
+  id INT PRIMARY KEY,
+  name VARCHAR(100),
+  price DECIMAL(10, 2)
+);</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="globals.css" data-strategy="code-structure">
+    <h4>CSS @tailwind</h4>
+    <p class="expected">Expected: <code>globals.css</code> (source: code-structure, confidence: medium)</p>
+    <pre><code class="language-css">@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-gray-100;
+}</code></pre>
+  </div>
+
+  <!-- ============ STRATEGY 6: Smart Default / Extracted ============ -->
+  <h2>Strategy 6: Smart Default (Extracted)</h2>
+
+  <div class="test-case" data-expected="user_service.rs" data-strategy="extracted">
+    <h4>Rust struct name extraction</h4>
+    <p class="expected">Expected: <code>user_service.rs</code> (source: extracted, confidence: low)</p>
+    <pre><code class="language-rust">pub struct UserService {
+    db: Database,
+}
+
+impl UserService {
+    pub fn new(db: Database) -> Self {
+        Self { db }
+    }
+}</code></pre>
+  </div>
+
+  <div class="test-case" data-expected="my_component.js" data-strategy="extracted">
+    <h4>JS function name extraction</h4>
+    <p class="expected">Expected: <code>my_component.js</code> (source: extracted, confidence: low)</p>
+    <pre><code class="language-javascript">export function MyComponent() {
+  return &lt;div&gt;Hello&lt;/div&gt;;
+}</code></pre>
+  </div>
+
+  <script>
+    // ============ MOCK CHROME APIs ============
+    const mockStorage = {
+      projects: [
+        { id: 'proj1', name: 'Test Project', root: '/home/user/projects/test' },
+        { id: 'proj2', name: 'Another Project', root: '/home/user/projects/another' }
+      ],
+      defaultProject: 'proj1',
+      lastProject: 'proj1',
+      recentPaths: {}
+    };
+
+    window.chrome = {
+      runtime: {
+        sendMessage: (msg, callback) => {
+          console.log('[Mock] chrome.runtime.sendMessage:', msg);
+          // Simulate native host response
+          setTimeout(() => {
+            callback({ success: true, full_path: msg.message?.path || '/mock/path' });
+          }, 100);
+        },
+        lastError: null
+      },
+      storage: {
+        sync: {
+          get: (keys, callback) => {
+            const result = {};
+            (Array.isArray(keys) ? keys : [keys]).forEach(k => {
+              if (mockStorage[k] !== undefined) result[k] = mockStorage[k];
+            });
+            callback(result);
+          },
+          set: (data, callback) => {
+            Object.assign(mockStorage, data);
+            callback?.();
+          }
+        },
+        local: {
+          get: (keys, callback) => {
+            const result = {};
+            (Array.isArray(keys) ? keys : [keys]).forEach(k => {
+              if (mockStorage[k] !== undefined) result[k] = mockStorage[k];
+            });
+            callback(result);
+          },
+          set: (data, callback) => {
+            Object.assign(mockStorage, data);
+            callback?.();
+          }
+        }
+      }
+    };
+
+    // ============ CONTENT.JS (inline for testing) ============
+    (() => {
+      const PROCESSED_ATTR = 'data-ccs-processed';
+
+      const ICONS = {
+        save: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`,
+        check: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+        error: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`
+      };
+
+      function sendNativeMessage(message) {
+        return new Promise((resolve, reject) => {
+          chrome.runtime.sendMessage(
+            { target: 'background', message: message },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else if (!response) {
+                reject(new Error('No response from background script'));
+              } else {
+                resolve(response);
+              }
+            }
+          );
+        });
+      }
+
+      async function listProjects() {
+        return new Promise((resolve) => {
+          chrome.storage.sync.get(['projects', 'defaultProject'], (data) => {
+            const projects = data.projects || [];
+            if (projects.length === 0) {
+              resolve({
+                projects: [],
+                default: null,
+                error: 'No projects configured.'
+              });
+            } else {
+              resolve({
+                projects: projects,
+                default: data.defaultProject || projects[0]?.id || null
+              });
+            }
+          });
+        });
+      }
+
+      async function getRecentPaths(projectId) {
+        return new Promise((resolve) => {
+          chrome.storage.local.get(['recentPaths'], (data) => {
+            const all = data.recentPaths || {};
+            resolve(all[projectId] || []);
+          });
+        });
+      }
+
+      async function saveRecentPath(projectId, filePath) {
+        return new Promise((resolve) => {
+          chrome.storage.local.get(['recentPaths'], (data) => {
+            const all = data.recentPaths || {};
+            const paths = all[projectId] || [];
+            const updated = [filePath, ...paths.filter(p => p !== filePath)].slice(0, 10);
+            all[projectId] = updated;
+            chrome.storage.local.set({ recentPaths: all }, resolve);
+          });
+        });
+      }
+
+      async function getLastDirectory(projectId) {
+        const paths = await getRecentPaths(projectId);
+        if (paths.length > 0) {
+          const lastPath = paths[0];
+          const lastSlash = lastPath.lastIndexOf('/');
+          return lastSlash > 0 ? lastPath.substring(0, lastSlash + 1) : '';
+        }
+        return '';
+      }
+
+      async function saveFile(absolutePath, content) {
+        try {
+          const response = await sendNativeMessage({
+            action: 'save',
+            path: absolutePath,
+            content: content
+          });
+          return response;
+        } catch (e) {
+          return { success: false, error: e.message };
+        }
+      }
+
+      // ============ FILENAME DETECTOR ============
+      const FilenameDetector = {
+        detect(preElement, codeContent, languageExt) {
+          const codeBlock = preElement.querySelector('code') || preElement;
+          const surroundingText = this.getSurroundingText(preElement);
+          
+          return this.fromCodeBlockHeader(preElement)
+              || this.fromConversationContext(surroundingText)
+              || this.fromFirstLineComment(codeContent)
+              || this.fromCodeStructure(codeContent, languageExt)
+              || this.fromMarkdownContext(preElement)
+              || this.generateSmartDefault(codeContent, languageExt);
+        },
+
+        getSurroundingText(preElement) {
+          const texts = [];
+          let sibling = preElement.previousElementSibling;
+          for (let i = 0; i < 5 && sibling; i++) {
+            texts.push(sibling.textContent || '');
+            sibling = sibling.previousElementSibling;
+          }
+          const parent = preElement.parentElement;
+          if (parent) {
+            let parentSibling = parent.previousElementSibling;
+            for (let i = 0; i < 3 && parentSibling; i++) {
+              texts.push(parentSibling.textContent || '');
+              parentSibling = parentSibling.previousElementSibling;
+            }
+          }
+          const grandparent = parent?.parentElement;
+          if (grandparent) {
+            let gpSibling = grandparent.previousElementSibling;
+            for (let i = 0; i < 2 && gpSibling; i++) {
+              texts.push(gpSibling.textContent || '');
+              gpSibling = gpSibling.previousElementSibling;
+            }
+          }
+          return texts.join(' ').substring(0, 3000);
+        },
+
+        fromCodeBlockHeader(preElement) {
+          const header = preElement.previousElementSibling;
+          if (header) {
+            const headerText = header.textContent?.trim() || '';
+            const match = headerText.match(/^([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)$/);
+            if (match) {
+              return { filename: match[1], source: 'header', confidence: 'high' };
+            }
+          }
+          const codeEl = preElement.querySelector('code');
+          if (codeEl) {
+            const dataFile = codeEl.getAttribute('data-file') 
+                          || codeEl.getAttribute('data-filename')
+                          || preElement.getAttribute('data-file');
+            if (dataFile) {
+              return { filename: dataFile, source: 'data-attr', confidence: 'high' };
+            }
+          }
+          const title = preElement.getAttribute('title') || codeEl?.getAttribute('title');
+          if (title && /\.[a-z0-9]+$/i.test(title)) {
+            return { filename: title, source: 'title-attr', confidence: 'high' };
+          }
+          return null;
+        },
+
+        fromConversationContext(text) {
+          const patterns = [
+            { re: /(?:save|create|write)\s+(?:this\s+)?(?:as|to|in)\s+[`'"]?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]?/i, conf: 'high' },
+            { re: /(?:file|filename|name)[:\s]+[`'"]?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]?/i, conf: 'high' },
+            { re: /(?:called|named)\s+[`'"]?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]?/i, conf: 'high' },
+            { re: /(?:update|modify|edit|change)\s+(?:your\s+)?[`'"]?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]?/i, conf: 'high' },
+            { re: /(?:here'?s?|this is)\s+(?:the\s+)?(?:updated?\s+)?[`'"]?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]?/i, conf: 'medium' },
+            { re: /[`'"]([a-zA-Z0-9_\-]+\/[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]/i, conf: 'medium' },
+            { re: /[`'"]([a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+)[`'"]/i, conf: 'low' },
+            { re: /\bin\s+[`'"]?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]?/i, conf: 'medium' },
+            { re: /^#+\s*[`'"]?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]?\s*$/m, conf: 'high' },
+          ];
+          for (const { re, conf } of patterns) {
+            const match = text.match(re);
+            if (match && match[1]) {
+              const filename = match[1];
+              if (this.isValidFilename(filename)) {
+                return { filename, source: 'context', confidence: conf };
+              }
+            }
+          }
+          return null;
+        },
+
+        fromFirstLineComment(code) {
+          const lines = code.trim().split('\n').slice(0, 3);
+          const patterns = [
+            /^\/\/\s*(?:file(?:name|path)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
+            /^#\s*(?:file(?:name|path)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
+            /^\/\*+\s*(?:@file\s+)?(?:file(?:name|path)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
+            /^<!--\s*(?:file(?:name|path)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
+            /^--\s*(?:file(?:name|path)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
+          ];
+          for (const line of lines) {
+            for (const pattern of patterns) {
+              const match = line.match(pattern);
+              if (match && match[1] && this.isValidFilename(match[1])) {
+                return { filename: match[1], source: 'comment', confidence: 'high' };
+              }
+            }
+          }
+          return null;
+        },
+
+        fromCodeStructure(code, ext) {
+          const rules = [
+            { test: /^fn\s+main\s*\(/m, ext: 'rs', name: 'main.rs', conf: 'high' },
+            { test: /^#\[cfg\(test\)\]/m, ext: 'rs', name: 'lib.rs', conf: 'medium' },
+            { test: /^pub\s+mod\s+/m, ext: 'rs', name: 'lib.rs', conf: 'medium' },
+            { test: /^mod\s+tests\s*\{/m, ext: 'rs', name: 'lib.rs', conf: 'medium' },
+            { test: /^(?:pub\s+)?struct\s+(\w+)/m, ext: 'rs', nameFn: (m) => this.toSnakeCase(m[1]) + '.rs', conf: 'low' },
+            { test: /^if\s+__name__\s*==\s*['"]__main__['"]/m, ext: 'py', name: 'main.py', conf: 'high' },
+            { test: /^from\s+flask\s+import/m, ext: 'py', name: 'app.py', conf: 'medium' },
+            { test: /^from\s+django/m, ext: 'py', name: 'views.py', conf: 'low' },
+            { test: /^import\s+pytest/m, ext: 'py', name: 'test_main.py', conf: 'medium' },
+            { test: /^def\s+test_/m, ext: 'py', name: 'test_main.py', conf: 'medium' },
+            { test: /^class\s+(\w+)(?:\(.*\))?:/m, ext: 'py', nameFn: (m) => this.toSnakeCase(m[1]) + '.py', conf: 'low' },
+            { test: /^['"]use client['"]/m, ext: 'jsx', name: 'page.tsx', conf: 'medium' },
+            { test: /^['"]use server['"]/m, ext: 'js', name: 'actions.ts', conf: 'medium' },
+            { test: /^(?:export\s+)?(?:default\s+)?function\s+(\w+)/m, extMatch: /^[jt]sx?$/, nameFn: (m, ext) => { const name = m[1]; if (/^[A-Z]/.test(name)) { return `${name}.${ext === 'ts' ? 'tsx' : 'jsx'}`; } return null; }, conf: 'medium' },
+            { test: /^export\s+default\s+function\s+(\w+)/m, ext: 'js', nameFn: (m) => `${m[1]}.js`, conf: 'low' },
+            { test: /^package\s+main\b/m, ext: 'go', name: 'main.go', conf: 'high' },
+            { test: /^func\s+Test\w+\s*\(/m, ext: 'go', name: 'main_test.go', conf: 'medium' },
+            { test: /^\[package\]\s*$/m, ext: 'toml', name: 'Cargo.toml', conf: 'high' },
+            { test: /^\[dependencies\]/m, ext: 'toml', name: 'Cargo.toml', conf: 'medium' },
+            { test: /^\[tool\.poetry\]/m, ext: 'toml', name: 'pyproject.toml', conf: 'high' },
+            { test: /^\[build-system\]/m, ext: 'toml', name: 'pyproject.toml', conf: 'medium' },
+            { test: /^{\s*"name"\s*:\s*"[^"]+"\s*,\s*"version"/m, ext: 'json', name: 'package.json', conf: 'high' },
+            { test: /^{\s*"compilerOptions"/m, ext: 'json', name: 'tsconfig.json', conf: 'high' },
+            { test: /"manifest_version"\s*:\s*\d/m, ext: 'json', name: 'manifest.json', conf: 'high' },
+            { test: /^{\s*"scripts"\s*:/m, ext: 'json', name: 'package.json', conf: 'medium' },
+            { test: /^version:\s*['"]?\d/m, ext: 'yaml', name: 'docker-compose.yml', conf: 'low' },
+            { test: /^services:\s*$/m, ext: 'yaml', name: 'docker-compose.yml', conf: 'medium' },
+            { test: /^FROM\s+\w+/m, name: 'Dockerfile', conf: 'high' },
+            { test: /^apiVersion:\s*apps\/v1/m, ext: 'yaml', name: 'deployment.yaml', conf: 'medium' },
+            { test: /^@tailwind/m, ext: 'css', name: 'globals.css', conf: 'medium' },
+            { test: /^<!DOCTYPE html>/i, ext: 'html', name: 'index.html', conf: 'medium' },
+            { test: /^<html/i, ext: 'html', name: 'index.html', conf: 'low' },
+            { test: /^#!\/usr\/bin\/env\s+bash/m, ext: 'sh', name: 'script.sh', conf: 'medium' },
+            { test: /^#!\/bin\/bash/m, ext: 'sh', name: 'script.sh', conf: 'medium' },
+            { test: /^#!\/usr\/bin\/env\s+sh/m, ext: 'sh', name: 'script.sh', conf: 'medium' },
+            { test: /^#!\/usr\/bin\/env\s+zsh/m, ext: 'sh', name: 'script.zsh', conf: 'medium' },
+            { test: /^:root\s*{/m, ext: 'css', name: 'styles.css', conf: 'low' },
+            { test: /^CREATE\s+TABLE/im, ext: 'sql', name: 'schema.sql', conf: 'medium' },
+            { test: /^CREATE\s+DATABASE/im, ext: 'sql', name: 'init.sql', conf: 'medium' },
+            { test: /^INSERT\s+INTO/im, ext: 'sql', name: 'seed.sql', conf: 'low' },
+          ];
+          for (const rule of rules) {
+            if (rule.ext && ext !== rule.ext) continue;
+            if (rule.extMatch && !rule.extMatch.test(ext)) continue;
+            const match = code.match(rule.test);
+            if (match) {
+              let filename;
+              if (rule.nameFn) {
+                filename = rule.nameFn(match, ext);
+                if (!filename) continue;
+              } else {
+                filename = rule.name;
+              }
+              return { filename, source: 'code-structure', confidence: rule.conf };
+            }
+          }
+          return null;
+        },
+
+        fromMarkdownContext(preElement) {
+          let el = preElement.previousElementSibling;
+          for (let i = 0; i < 3 && el; i++) {
+            const text = el.textContent?.trim() || '';
+            const patterns = [
+              /^#+\s*[`'"]?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]?\s*$/,
+              /^\*\*[`'"]?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]?\*\*$/,
+              /^File:\s*[`'"]?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)[`'"]?$/i,
+            ];
+            for (const pattern of patterns) {
+              const match = text.match(pattern);
+              if (match && match[1] && this.isValidFilename(match[1])) {
+                return { filename: match[1], source: 'markdown', confidence: 'high' };
+              }
+            }
+            el = el.previousElementSibling;
+          }
+          return null;
+        },
+
+        generateSmartDefault(code, ext) {
+          const extractors = [
+            { re: /^(?:export\s+)?(?:async\s+)?function\s+(\w+)/m, suffix: ext },
+            { re: /^(?:export\s+)?class\s+(\w+)/m, suffix: ext },
+            { re: /^(?:export\s+)?const\s+(\w+)\s*=/m, suffix: ext },
+            { re: /^(?:pub\s+)?(?:struct|enum)\s+(\w+)/m, suffix: 'rs' },
+          ];
+          for (const { re, suffix } of extractors) {
+            const match = code.match(re);
+            if (match && match[1]) {
+              const name = this.toSnakeCase(match[1]);
+              return { filename: `${name}.${suffix || ext}`, source: 'extracted', confidence: 'low' };
+            }
+          }
+          return { filename: `snippet-${Date.now().toString(36)}.${ext}`, source: 'generated', confidence: 'none' };
+        },
+
+        toSnakeCase(str) {
+          return str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '').replace(/__+/g, '_');
+        },
+
+        isValidFilename(name) {
+          if (!name || name.length > 255) return false;
+          if (name.startsWith('.') && name.split('.').length < 3) return false;
+          if (/^[0-9]/.test(name)) return false;
+          if (!/\.[a-z0-9]{1,10}$/i.test(name)) return false;
+          if (/[<>:"|?*]/.test(name)) return false;
+          return true;
+        }
+      };
+
+      // Expose for testing
+      window.FilenameDetector = FilenameDetector;
+
+      function detectLanguage(codeBlock) {
+        const classes = (codeBlock.className || '') + ' ' + (codeBlock.closest('pre')?.className || '');
+        const langMap = [
+          [/\b(rust)\b/i, 'rs'], [/\b(javascript|js)\b/i, 'js'], [/\b(typescript|ts)\b/i, 'ts'],
+          [/\b(python|py)\b/i, 'py'], [/\b(bash|shell|sh)\b/i, 'sh'], [/\b(json)\b/i, 'json'],
+          [/\b(yaml|yml)\b/i, 'yaml'], [/\b(toml)\b/i, 'toml'], [/\b(sql)\b/i, 'sql'],
+          [/\b(html)\b/i, 'html'], [/\b(css)\b/i, 'css'], [/\b(markdown|md)\b/i, 'md'],
+          [/\b(go|golang)\b/i, 'go'], [/\b(java)\b/i, 'java'], [/\b(c|cpp|c\+\+)\b/i, 'cpp'],
+          [/\b(ruby|rb)\b/i, 'rb'], [/\b(php)\b/i, 'php'], [/\b(swift)\b/i, 'swift'],
+          [/\b(kotlin|kt)\b/i, 'kt'], [/\b(dockerfile)\b/i, 'dockerfile'],
+        ];
+        for (const [pattern, ext] of langMap) {
+          if (pattern.test(classes)) return ext;
+        }
+        return 'txt';
+      }
+
+      window.detectLanguage = detectLanguage;
+
+      function joinPath(root, relativePath) {
+        const cleanRelative = relativePath.replace(/^\/+/, '');
+        const cleanRoot = root.replace(/\/+$/, '');
+        return `${cleanRoot}/${cleanRelative}`;
+      }
+
+      async function showSaveModal(code, detectedInfo, onSave, onCancel) {
+        const { projects, default: defaultProject, error } = await listProjects();
+        if (error || projects.length === 0) {
+          alert(`Copilot Code Saver: ${error || 'No projects configured'}`);
+          onCancel();
+          return;
+        }
+        const overlay = document.createElement('div');
+        overlay.className = 'ccs-modal-overlay';
+        chrome.storage.sync.get(['lastProject'], async (stored) => {
+          const selectedProjectId = stored.lastProject || defaultProject || projects[0]?.id;
+          const lastDir = await getLastDirectory(selectedProjectId);
+          let defaultFilename = detectedInfo.filename || `snippet-${Date.now().toString(36)}.${detectedInfo.ext}`;
+          if (lastDir && !defaultFilename.includes('/')) {
+            defaultFilename = lastDir + defaultFilename;
+          }
+          const projectOptions = projects.map(p =>
+            `<option value="${p.id}" ${p.id === selectedProjectId ? 'selected' : ''}>${p.name}</option>`
+          ).join('');
+          const selectedProjectData = projects.find(p => p.id === selectedProjectId);
+          const confidenceBadge = detectedInfo.confidence && detectedInfo.confidence !== 'none'
+            ? `<span class="ccs-confidence ccs-confidence-${detectedInfo.confidence}">${detectedInfo.confidence}</span>`
+            : '';
+          overlay.innerHTML = `
+            <div class="ccs-modal">
+              <h3>💾 Save to Project</h3>
+              ${detectedInfo.filename ? `
+                <div class="ccs-detected">
+                  ✨ Detected from ${detectedInfo.source}: <strong>${detectedInfo.filename}</strong>
+                  ${confidenceBadge}
+                </div>
+              ` : ''}
+              <label>Project</label>
+              <select id="ccs-project">${projectOptions}</select>
+              <label>Path (relative to project root)</label>
+              <input type="text" id="ccs-path" value="${defaultFilename}" placeholder="src/utils.rs">
+              <label>Full Path Preview</label>
+              <div class="ccs-preview" id="ccs-preview">
+                ${joinPath(selectedProjectData?.root || '', defaultFilename)}
+              </div>
+              <div class="ccs-modal-buttons">
+                <button class="ccs-modal-btn secondary" id="ccs-cancel">Cancel</button>
+                <button class="ccs-modal-btn primary" id="ccs-save">Save</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(overlay);
+          const projectSelect = overlay.querySelector('#ccs-project');
+          const pathInput = overlay.querySelector('#ccs-path');
+          const preview = overlay.querySelector('#ccs-preview');
+          function updatePreview() {
+            const proj = projects.find(p => p.id === projectSelect.value);
+            const relativePath = pathInput.value.replace(/^\/+/, '');
+            preview.textContent = joinPath(proj?.root || '', relativePath);
+          }
+          projectSelect.addEventListener('change', async () => {
+            const newProjectId = projectSelect.value;
+            const newLastDir = await getLastDirectory(newProjectId);
+            const currentPath = pathInput.value;
+            if (newLastDir && !currentPath.includes('/')) {
+              pathInput.value = newLastDir + currentPath;
+            }
+            updatePreview();
+          });
+          pathInput.addEventListener('input', updatePreview);
+          pathInput.focus();
+          pathInput.select();
+          overlay.querySelector('#ccs-cancel').addEventListener('click', () => {
+            overlay.remove();
+            onCancel();
+          });
+          overlay.querySelector('#ccs-save').addEventListener('click', async () => {
+            const projectId = projectSelect.value;
+            const project = projects.find(p => p.id === projectId);
+            const relativePath = pathInput.value.trim().replace(/^\/+/, '');
+            if (!project) { alert('Please select a project'); return; }
+            if (!relativePath) { alert('Please enter a file path'); return; }
+            const absolutePath = joinPath(project.root, relativePath);
+            await saveRecentPath(projectId, relativePath);
+            chrome.storage.sync.set({ lastProject: projectId });
+            overlay.remove();
+            onSave(absolutePath);
+          });
+          overlay.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { overlay.remove(); onCancel(); }
+            else if (e.key === 'Enter' && !e.shiftKey) { overlay.querySelector('#ccs-save').click(); }
+          });
+        });
+      }
+
+      function injectButton(preElement, index) {
+        if (preElement.hasAttribute(PROCESSED_ATTR)) return;
+        preElement.setAttribute(PROCESSED_ATTR, 'true');
+        const codeEl = preElement.querySelector('code') || preElement;
+        const code = codeEl.textContent || '';
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position: relative; display: inline-block; width: 100%;';
+        preElement.parentNode.insertBefore(wrapper, preElement);
+        wrapper.appendChild(preElement);
+        const btn = document.createElement('button');
+        btn.innerHTML = ICONS.save;
+        btn.title = 'Save to project';
+        btn.style.cssText = `position: absolute; bottom: 10px; right: 10px; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; margin: 0; background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 6px; cursor: pointer; color: #444; transition: all 0.15s ease; box-shadow: 0 1px 4px rgba(0,0,0,0.12); z-index: 10000;`;
+        btn.addEventListener('mouseenter', () => { btn.style.background = '#0078d4'; btn.style.color = 'white'; btn.style.borderColor = '#0078d4'; });
+        btn.addEventListener('mouseleave', () => { btn.style.background = 'rgba(255, 255, 255, 0.95)'; btn.style.color = '#444'; btn.style.borderColor = 'rgba(0, 0, 0, 0.15)'; });
+        btn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const ext = detectLanguage(codeEl);
+          const detected = FilenameDetector.detect(preElement, code, ext);
+          const detectedInfo = { filename: detected.filename, source: detected.source, confidence: detected.confidence, ext: ext };
+          showSaveModal(code, detectedInfo,
+            async (absolutePath) => {
+              const result = await saveFile(absolutePath, code);
+              if (result.success) { btn.innerHTML = ICONS.check; btn.title = `Saved to ${result.full_path}`; }
+              else { btn.innerHTML = ICONS.error; btn.title = `Error: ${result.error}`; alert(`Save failed: ${result.error}`); }
+              setTimeout(() => { btn.innerHTML = ICONS.save; btn.title = 'Save to project'; }, 2000);
+            },
+            () => {}
+          );
+        });
+        wrapper.appendChild(btn);
+      }
+
+      function processCodeBlocks() {
+        document.querySelectorAll('.test-case pre').forEach((pre, index) => {
+          injectButton(pre, index);
+        });
+      }
+
+      // Run after DOM ready
+      setTimeout(processCodeBlocks, 100);
+      console.log('[Copilot Code Saver] Test harness loaded');
+    })();
+
+    // ============ TEST RUNNER ============
+    document.getElementById('run-tests').addEventListener('click', () => {
+      const results = [];
+      const testCases = document.querySelectorAll('.test-case');
+      
+      testCases.forEach((tc, i) => {
+        const pre = tc.querySelector('pre');
+        const codeEl = pre.querySelector('code') || pre;
+        const code = codeEl.textContent || '';
+        const ext = window.detectLanguage(codeEl);
+        const expected = tc.dataset.expected;
+        const expectedStrategy = tc.dataset.strategy;
+        
+        const detected = window.FilenameDetector.detect(pre, code, ext);
+        const pass = detected.filename === expected;
+        
+        results.push({
+          index: i + 1,
+          expected,
+          expectedStrategy,
+          actual: detected.filename,
+          source: detected.source,
+          confidence: detected.confidence,
+          pass
+        });
+      });
+      
+      // Render results
+      const passed = results.filter(r => r.pass).length;
+      const total = results.length;
+      
+      document.getElementById('summary').innerHTML = `
+        <strong>${passed}/${total}</strong> tests passed
+        <span style="color: ${passed === total ? '#28a745' : '#dc3545'}">
+          (${Math.round(passed/total*100)}%)
+        </span>
+      `;
+      
+      document.getElementById('results-list').innerHTML = results.map(r => `
+        <div class="result-item ${r.pass ? 'pass' : 'fail'}">
+          <div class="filename">#${r.index}: ${r.actual}</div>
+          <div class="meta">
+            ${r.pass ? '✅' : '❌'} Expected: ${r.expected}<br>
+            Source: ${r.source} | Confidence: ${r.confidence}
+          </div>
+        </div>
+      `).join('');
+    });
+  </script>
+</body>
+</html>

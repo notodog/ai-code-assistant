@@ -1,3 +1,5 @@
+// extension/content.js
+
 (() => {
   const PROCESSED_ATTR = 'data-ccs-processed';
 
@@ -64,9 +66,6 @@
       chrome.storage.local.get(['recentPaths'], (data) => {
         const all = data.recentPaths || {};
         const paths = all[projectId] || [];
-        
-        // Extract directory
-        const dir = filePath.substring(0, filePath.lastIndexOf('/') + 1);
         
         // Add to front, remove duplicates, keep last 10
         const updated = [filePath, ...paths.filter(p => p !== filePath)].slice(0, 10);
@@ -162,7 +161,12 @@
      */
     fromCodeBlockHeader(preElement) {
       // Check for header element above code block
-      const header = preElement.previousElementSibling;
+      // After button injection, pre might be inside a wrapper div, so check parent too
+      let header = preElement.previousElementSibling;
+      if (!header && preElement.parentElement) {
+        header = preElement.parentElement.previousElementSibling;
+      }
+
       if (header) {
         const headerText = header.textContent?.trim() || '';
         
@@ -241,16 +245,16 @@
       const lines = code.trim().split('\n').slice(0, 3); // Check first 3 lines
       
       const patterns = [
-        // // filename.ext or // file: filename.ext
-        /^\/\/\s*(?:file(?:name)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
-        // # filename.ext or # file: filename.ext  
-        /^#\s*(?:file(?:name)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
-        // /* filename.ext */ or /** @file filename.ext */
-        /^\/\*+\s*(?:@file\s+)?(?:file(?:name)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
-        // <!-- filename.ext -->
-        /^<!--\s*(?:file(?:name)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
-        // -- filename.ext (SQL)
-        /^--\s*(?:file(?:name)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
+        // // filename.ext or // file: filename.ext or // filepath: path/to/file.ext
+        /^\/\/\s*(?:file(?:name|path)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
+        // # filename.ext or # file: filename.ext or # filepath: path/to/file.ext
+        /^#\s*(?:file(?:name|path)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
+        // /* filename.ext */ or /** @file filename.ext */ or /* filepath: path/to/file.ext */
+        /^\/\*+\s*(?:@file\s+)?(?:file(?:name|path)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
+        // <!-- filename.ext --> or <!-- filepath: path/to/file.ext -->
+        /^<!--\s*(?:file(?:name|path)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
+        // -- filename.ext (SQL) or -- filepath: path/to/file.sql
+        /^--\s*(?:file(?:name|path)?[:\s]+)?([a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/i,
       ];
       
       for (const line of lines) {
@@ -335,6 +339,7 @@
         { test: /^services:\s*$/m, ext: 'yaml', name: 'docker-compose.yml', conf: 'medium' },
         { test: /^FROM\s+\w+/m, name: 'Dockerfile', conf: 'high' },
         { test: /^apiVersion:\s*apps\/v1/m, ext: 'yaml', name: 'deployment.yaml', conf: 'medium' },
+        { test: /^@tailwind/m, ext: 'css', name: 'globals.css', conf: 'medium' },
         
         // ===== MARKUP =====
         { test: /^<!DOCTYPE html>/i, ext: 'html', name: 'index.html', conf: 'medium' },
@@ -348,7 +353,6 @@
         
         // ===== CSS =====
         { test: /^:root\s*{/m, ext: 'css', name: 'styles.css', conf: 'low' },
-        { test: /^@tailwind/m, ext: 'css', name: 'globals.css', conf: 'medium' },
         
         // ===== SQL =====
         { test: /^CREATE\s+TABLE/im, ext: 'sql', name: 'schema.sql', conf: 'medium' },
@@ -382,8 +386,25 @@
      */
     fromMarkdownContext(preElement) {
       // Look for markdown headers or bold text with filenames
+      // Check both direct siblings and parent's siblings (for wrapped pre elements)
+      const elementsToCheck = [];
+      
       let el = preElement.previousElementSibling;
       for (let i = 0; i < 3 && el; i++) {
+        elementsToCheck.push(el);
+        el = el.previousElementSibling;
+      }
+      
+      // Also check parent's siblings (for wrapped pre elements)
+      if (preElement.parentElement) {
+        let parentEl = preElement.parentElement.previousElementSibling;
+        for (let i = 0; i < 3 && parentEl; i++) {
+          elementsToCheck.push(parentEl);
+          parentEl = parentEl.previousElementSibling;
+        }
+      }
+      
+      for (const el of elementsToCheck) {
         const text = el.textContent?.trim() || '';
         
         // Check for "### filename.ext" or "**filename.ext**"
@@ -399,8 +420,6 @@
             return { filename: match[1], source: 'markdown', confidence: 'high' };
           }
         }
-        
-        el = el.previousElementSibling;
       }
       
       return null;
