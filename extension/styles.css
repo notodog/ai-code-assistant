@@ -1,4 +1,4 @@
-.ccs-modal-overlay {
+.aic-modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -12,7 +12,7 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.ccs-modal {
+.aic-modal {
   background: white;
   border-radius: 12px;
   padding: 20px;
@@ -20,14 +20,14 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
-.ccs-modal h3 {
+.aic-modal h3 {
   margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 600;
   color: #333;
 }
 
-.ccs-modal label {
+.aic-modal label {
   display: block;
   font-size: 12px;
   font-weight: 500;
@@ -35,8 +35,8 @@
   margin-bottom: 4px;
 }
 
-.ccs-modal input,
-.ccs-modal select {
+.aic-modal input,
+.aic-modal select {
   width: 100%;
   padding: 8px 10px;
   margin-bottom: 12px;
@@ -46,13 +46,13 @@
   box-sizing: border-box;
 }
 
-.ccs-modal input:focus,
-.ccs-modal select:focus {
+.aic-modal input:focus,
+.aic-modal select:focus {
   outline: none;
   border-color: #0078d4;
 }
 
-.ccs-detected {
+.aic-detected {
   background: #e7f3ff;
   border: 1px solid #0078d4;
   border-radius: 6px;
@@ -62,7 +62,7 @@
   color: #0078d4;
 }
 
-.ccs-preview {
+.aic-preview {
   background: #f5f5f5;
   border-radius: 6px;
   padding: 10px;
@@ -73,13 +73,13 @@
   margin-bottom: 12px;
 }
 
-.ccs-modal-buttons {
+.aic-modal-buttons {
   display: flex;
   gap: 8px;
   margin-top: 16px;
 }
 
-.ccs-modal-btn {
+.aic-modal-btn {
   flex: 1;
   padding: 10px 16px;
   border: none;
@@ -90,20 +90,20 @@
   transition: all 0.15s;
 }
 
-.ccs-modal-btn.primary {
+.aic-modal-btn.primary {
   background: #0078d4;
   color: white;
 }
 
-.ccs-modal-btn.primary:hover {
+.aic-modal-btn.primary:hover {
   background: #106ebe;
 }
 
-.ccs-modal-btn.secondary {
+.aic-modal-btn.secondary {
   background: #f0f0f0;
   color: #333;
 }
 
-.ccs-modal-btn.secondary:hover {
+.aic-modal-btn.secondary:hover {
   background: #e0e0e0;
 }

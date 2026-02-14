@@ -1,0 +1,9 @@
+{
+  "name": "com.aicode.host",
+  "description": "AI Code Assistant native messaging host",
+  "path": "/home/xzhou/bin/ai-code-host",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://YOUR_EXTENSION_ID/"
+  ]
+}

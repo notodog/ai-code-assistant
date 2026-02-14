@@ -1,8 +1,8 @@
 [package]
-name = "ccs-host"
-version = "0.2.0"
+name = "ai-code-host"
+version = "0.1.0"
 edition = "2021"
-description = "Native messaging host for Copilot Code Saver (stateless file writer)"
+description = "Native messaging host for AI Code Assistant"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

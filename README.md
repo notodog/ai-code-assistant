@@ -145,18 +145,10 @@ git clone https://github.com/yourusername/copilot-code-saver.git
 cd copilot-code-saver
 ```
 
-### Step 2: Build Native Host
-
+### Step 2: Run Installation Script
+ 
 ```bash
-cd native-host
-
-# Build release binary
-cargo build --release
-
-# Install binary
-mkdir -p ~/bin
-cp target/release/ccs-host ~/bin/
-chmod +x ~/bin/ccs-host
+./scripts/install.sh
 ```
 
 ### Step 3: Register Native Messaging Host

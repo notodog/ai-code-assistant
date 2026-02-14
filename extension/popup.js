@@ -1,6 +1,6 @@
 // ============ CONSTANTS ============
 
-const HOST_NAME = 'com.ccs.host';
+const HOST_NAME = 'com.aicode.host';
 
 // ============ DOM ELEMENTS ============
 

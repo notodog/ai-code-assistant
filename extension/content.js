@@ -1,7 +1,7 @@
 // extension/content.js
 
 (() => {
-  const PROCESSED_ATTR = 'data-ccs-processed';
+  const PROCESSED_ATTR = 'data-aic-processed';
 
   const ICONS = {
     save: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`,
@@ -524,13 +524,13 @@
     const { projects, default: defaultProject, error } = await listProjects();
 
     if (error || projects.length === 0) {
-      alert(`Copilot Code Saver: ${error || 'No projects configured'}\n\nClick the extension icon to add projects.`);
+      alert(`AI Code Assistant: ${error || 'No projects configured'}\n\nClick the extension icon to add projects.`);
       onCancel();
       return;
     }
 
     const overlay = document.createElement('div');
-    overlay.className = 'ccs-modal-overlay';
+    overlay.className = 'aic-modal-overlay';
 
     chrome.storage.sync.get(['lastProject'], async (stored) => {
       const selectedProjectId = stored.lastProject || defaultProject || projects[0]?.id;
@@ -554,43 +554,43 @@
       
       // Show confidence indicator
       const confidenceBadge = detectedInfo.confidence && detectedInfo.confidence !== 'none'
-        ? `<span class="ccs-confidence ccs-confidence-${detectedInfo.confidence}">${detectedInfo.confidence}</span>`
+        ? `<span class="aic-confidence aic-confidence-${detectedInfo.confidence}">${detectedInfo.confidence}</span>`
         : '';
 
       overlay.innerHTML = `
-        <div class="ccs-modal">
+        <div class="aic-modal">
           <h3>💾 Save to Project</h3>
           
           ${detectedInfo.filename ? `
-            <div class="ccs-detected">
+            <div class="aic-detected">
               ✨ Detected from ${detectedInfo.source}: <strong>${detectedInfo.filename}</strong>
               ${confidenceBadge}
             </div>
           ` : ''}
           
           <label>Project</label>
-          <select id="ccs-project">${projectOptions}</select>
+          <select id="aic-project">${projectOptions}</select>
           
           <label>Path (relative to project root)</label>
-          <input type="text" id="ccs-path" value="${defaultFilename}" placeholder="src/utils.rs">
+          <input type="text" id="aic-path" value="${defaultFilename}" placeholder="src/utils.rs">
           
           <label>Full Path Preview</label>
-          <div class="ccs-preview" id="ccs-preview">
+          <div class="aic-preview" id="aic-preview">
             ${joinPath(selectedProjectData?.root || '', defaultFilename)}
           </div>
           
-          <div class="ccs-modal-buttons">
-            <button class="ccs-modal-btn secondary" id="ccs-cancel">Cancel</button>
-            <button class="ccs-modal-btn primary" id="ccs-save">Save</button>
+          <div class="aic-modal-buttons">
+            <button class="aic-modal-btn secondary" id="aic-cancel">Cancel</button>
+            <button class="aic-modal-btn primary" id="aic-save">Save</button>
           </div>
         </div>
       `;
 
       document.body.appendChild(overlay);
 
-      const projectSelect = overlay.querySelector('#ccs-project');
-      const pathInput = overlay.querySelector('#ccs-path');
-      const preview = overlay.querySelector('#ccs-preview');
+      const projectSelect = overlay.querySelector('#aic-project');
+      const pathInput = overlay.querySelector('#aic-path');
+      const preview = overlay.querySelector('#aic-preview');
 
       function updatePreview() {
         const proj = projects.find(p => p.id === projectSelect.value);
@@ -616,12 +616,12 @@
       pathInput.focus();
       pathInput.select();
 
-      overlay.querySelector('#ccs-cancel').addEventListener('click', () => {
+      overlay.querySelector('#aic-cancel').addEventListener('click', () => {
         overlay.remove();
         onCancel();
       });
 
-      overlay.querySelector('#ccs-save').addEventListener('click', async () => {
+      overlay.querySelector('#aic-save').addEventListener('click', async () => {
         const projectId = projectSelect.value;
         const project = projects.find(p => p.id === projectId);
         const relativePath = pathInput.value.trim().replace(/^\/+/, '');
@@ -652,7 +652,7 @@
           overlay.remove();
           onCancel();
         } else if (e.key === 'Enter' && !e.shiftKey) {
-          overlay.querySelector('#ccs-save').click();
+          overlay.querySelector('#aic-save').click();
         }
       });
     });
@@ -757,5 +757,5 @@
   processCodeBlocks();
   observer.observe(document.body, { childList: true, subtree: true });
 
-  console.log('[Copilot Code Saver] Loaded v0.4.0');
+  console.log('[AI Code Assistant] Loaded v0.1.0');
 })();
