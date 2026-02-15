@@ -671,7 +671,7 @@
   }
 
   // ============ EXECUTE MODAL ============
-  
+
   async function showExecuteModal(code, detectedInfo, onExecute, onCancel) {
     const { projects, default: defaultProject, error } = await listProjects();
   
@@ -685,27 +685,31 @@
     overlay.className = 'aic-modal-overlay';
   
     chrome.storage.sync.get(['lastProject'], async (stored) => {
-      const selectedProjectId = stored.lastProject || defaultProject || projects[0]?.id;
-      const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const workdir = selectedProject?.workdir || selectedProject?.root || '/tmp';
-  
-      const projectOptions = projects.map(p =>
-        `<option value="${p.id}" ${p.id === selectedProjectId ? 'selected' : ''}>${p.name}</option>`
-      ).join('');
-  
-      const preview = code.length > 500 ? code.substring(0, 500) + '\n...(truncated)' : code;
+      const selectedProjectId = stored.lastProject || defaultProject?.id;
+      const selectedProject = projects.find(p => p.id === selectedProjectId) || projects[0];
+      const workdir = selectedProject?.root || '/tmp';
+      
+      // Script analysis
       const lineCount = code.split('\n').length;
-  
+      const preview = code.length > 500 ? code.substring(0, 497) + '...' : code;
+      
       overlay.innerHTML = `
         <div class="aic-modal">
-          <h3>⚡ Execute Shell Script</h3>
+          <h3>▶️ Execute Shell Script</h3>
           
-          <label>Project:</label>
-          <select id="aic-exec-project">${projectOptions}</select>
-         
+          <label>Project</label>
+          <select id="aic-exec-project">
+            ${projects.map(p => `
+              <option value="${p.id}" ${p.id === selectedProjectId ? 'selected' : ''}>
+                ${p.name}
+              </option>
+            `).join('')}
+          </select>
+          
           <div style="margin: 12px 0; padding: 8px; background: #333333; border-radius: 4px; font-size: 12px;">
             <strong>Working Directory:</strong> <code id="aic-exec-workdir-display">${workdir}</code>
           </div>
+          
           <label>Script Preview (${lineCount} lines):</label>
           <pre class="aic-exec-preview">${preview}</pre>
           
@@ -722,25 +726,37 @@
             <pre id="aic-stdout" class="aic-stdout"></pre>
             <pre id="aic-stderr" class="aic-stderr"></pre>
             <div id="aic-status" class="aic-status"></div>
+            
+            <!-- NEW: Copy to Reply Section -->
+            <div id="aic-copy-reply" style="display:none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #e0e0e0;">
+              <button id="aic-copy-to-reply" class="aic-modal-btn primary">
+                📋 Copy to Reply
+              </button>
+              <button id="aic-retry" class="aic-modal-btn secondary">
+                🔄 Retry
+              </button>
+            </div>
           </div>
         </div>
       `;
   
       document.body.appendChild(overlay);
   
-      // Update workdir when project changes
-      overlay.querySelector('#aic-exec-project').addEventListener('change', (e) => {
-        const proj = projects.find(p => p.id === e.target.value);
-        const newWorkdir = proj?.workdir || project?.root || '/tmp';
-        overlay.querySelector('#aic-exec-workdir-display').textContent = newWorkdir;
-        chrome.storage.sync.set({ lastProject: projectId });
+      // Project selector change handler
+      const projectSelect = overlay.querySelector('#aic-exec-project');
+      projectSelect.addEventListener('change', () => {
+        const selectedId = projectSelect.value;
+        const project = projects.find(p => p.id === selectedId);
+        if (project) {
+          overlay.querySelector('#aic-exec-workdir-display').textContent = project.root;
+          chrome.storage.sync.set({ lastProject: selectedId });
+        }
       });
   
-      // Execute button
-      overlay.querySelector('#aic-execute').addEventListener('click', async () => {
-        const projectId = overlay.querySelector('#aic-exec-project').value;
-        const project = projects.find(p => p.id === projectId);
-        const workdir = project?.workdir || project?.root;
+      // Execute button handler
+      const executeBtn = overlay.querySelector('#aic-execute');
+      executeBtn.addEventListener('click', async () => {
+        const workdir = overlay.querySelector('#aic-exec-workdir-display').textContent;
         const timeout = parseInt(overlay.querySelector('#aic-exec-timeout').value);
         const btn = overlay.querySelector('#aic-execute');
         
@@ -762,10 +778,21 @@
           const stdoutEl = overlay.querySelector('#aic-stdout');
           const stderrEl = overlay.querySelector('#aic-stderr');
           const statusEl = overlay.querySelector('#aic-status');
+          const copyReplyDiv = overlay.querySelector('#aic-copy-reply');
   
           stdoutEl.textContent = response.stdout || '(no output)';
           stderrEl.textContent = response.stderr || '';
           stderrEl.style.display = response.stderr ? 'block' : 'none';
+  
+          // Store execution result for copy-to-reply
+          const executionResult = {
+            command: code,
+            workdir: workdir,
+            stdout: response.stdout || '',
+            stderr: response.stderr || '',
+            exitCode: response.exit_code || 0,
+            success: response.success
+          };
   
           if (response.success) {
             statusEl.innerHTML = `✅ Exit code: ${response.exit_code || 0}`;
@@ -773,29 +800,52 @@
             btn.textContent = '✓ Executed';
             onExecute();
           } else {
-            statusEl.innerHTML = `❌ ${response.error || 'Execution failed'} (exit code: ${response.exit_code || 'unknown'})`;
+            statusEl.innerHTML = `❌ Failed${response.exit_code ? ` (exit ${response.exit_code})` : ''}: ${response.error || 'Unknown error'}`;
             statusEl.className = 'aic-status error';
-            btn.disabled = false;
-            btn.textContent = '▶️ Retry';
+            btn.textContent = 'Failed';
           }
+  
+          // Show copy-to-reply button
+          copyReplyDiv.style.display = 'flex';
+          copyReplyDiv.style.gap = '8px';
+  
+          // Copy to Reply handler
+          overlay.querySelector('#aic-copy-to-reply').addEventListener('click', () => {
+            insertExecutionResultToChat(executionResult);
+            overlay.remove();
+          });
+  
+          // Retry handler
+          overlay.querySelector('#aic-retry').addEventListener('click', () => {
+            // Reset UI
+            outputDiv.style.display = 'none';
+            btn.disabled = false;
+            btn.textContent = '▶️ Execute';
+            copyReplyDiv.style.display = 'none';
+          });
+  
         } catch (error) {
-          alert('Execution failed: ' + error.message);
+          const statusEl = overlay.querySelector('#aic-status');
+          statusEl.innerHTML = `❌ Error: ${error.message}`;
+          statusEl.className = 'aic-status error';
           btn.disabled = false;
-          btn.textContent = '▶️ Execute';
+          btn.textContent = 'Retry';
         }
       });
   
-      // Cancel button
+      // Cancel button handler
       overlay.querySelector('#aic-cancel').addEventListener('click', () => {
         overlay.remove();
         onCancel();
       });
   
-      // ESC to close
+      // Keyboard shortcuts
       overlay.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           overlay.remove();
           onCancel();
+        } else if (e.key === 'Enter' && !e.shiftKey && !executeBtn.disabled) {
+          executeBtn.click();
         }
       });
   
@@ -807,6 +857,233 @@
         }
       });
     });
+  }
+
+  // Helper function to copy output to AI chat
+  function copyOutputToAIChat(stdout, stderr, exitCode) {
+    // Build formatted output
+    let formattedOutput = 'Execution Result:\n```\n';
+    
+    if (stdout) {
+      formattedOutput += `[stdout]:\n${stdout}\n`;
+    }
+    
+    if (stderr) {
+      formattedOutput += `[stderr]:\n${stderr}\n`;
+    }
+    
+    formattedOutput += `[exit code]: ${exitCode}\n`;
+    formattedOutput += '```';
+    
+    // Try different AI chat interfaces
+    const chatSelectors = [
+      // ChatGPT
+      'textarea[data-id="composer-input"]',
+      'textarea[placeholder*="Message"]',
+      // Claude
+      'div[contenteditable="true"][data-placeholder]',
+      'div.ProseMirror[contenteditable="true"]',
+      // Gemini
+      'textarea[placeholder*="Enter a prompt"]',
+      'div[contenteditable="true"][aria-label*="prompt"]'
+    ];
+    
+    let inserted = false;
+    
+    for (const selector of chatSelectors) {
+      const chatInput = document.querySelector(selector);
+      if (chatInput) {
+        if (chatInput.tagName === 'TEXTAREA') {
+          // For textarea elements
+          chatInput.value = formattedOutput;
+          chatInput.focus();
+          
+          // Trigger input event for React/Vue reactivity
+          chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+          chatInput.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+          // For contenteditable divs
+          chatInput.innerText = formattedOutput;
+          chatInput.focus();
+          
+          // Trigger input event
+          chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+          
+          // Place cursor at end
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.selectNodeContents(chatInput);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+        inserted = true;
+        break;
+      }
+    }
+    
+    // Fallback to clipboard if no chat input found
+    if (!inserted) {
+      navigator.clipboard.writeText(formattedOutput).then(() => {
+        alert('Output copied to clipboard! Paste it in the chat to share the results.');
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+        alert('Failed to copy output. Please try again.');
+      });
+    }
+  }
+  
+  // Helper to escape HTML
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function insertExecutionResultToChat(executionResult) {
+    // Format the execution result for AI chat
+    const formattedOutput = formatExecutionOutput(executionResult);
+    
+    // Detect which AI platform we're on
+    const platform = detectAIPlatform();
+    
+    // Try to insert into the chat input
+    const inserted = insertIntoTextArea(platform, formattedOutput);
+    
+    if (!inserted) {
+      // Fallback: copy to clipboard
+      copyToClipboard(formattedOutput);
+      showToast('📋 Execution result copied to clipboard!');
+    } else {
+      showToast('✅ Execution result added to reply!');
+    }
+  }
+  
+  function formatExecutionOutput(result) {
+    let output = '```\n';
+    output += `Command executed: ${result.command.split('\n')[0]}...\n`;
+    output += `Working directory: ${result.workdir}\n`;
+    output += `Exit code: ${result.exitCode}\n`;
+    output += '\n--- Output ---\n';
+    
+    if (result.stdout) {
+      output += result.stdout;
+      if (!result.stdout.endsWith('\n')) output += '\n';
+    }
+    
+    if (result.stderr) {
+      output += '\n--- Errors ---\n';
+      output += result.stderr;
+      if (!result.stderr.endsWith('\n')) output += '\n';
+    }
+    
+    output += '```';
+    return output;
+  }
+  
+  function detectAIPlatform() {
+    const hostname = window.location.hostname;
+    
+    if (hostname.includes('chat.openai.com')) return 'chatgpt';
+    if (hostname.includes('claude.ai')) return 'claude';
+    if (hostname.includes('gemini.google.com')) return 'gemini';
+    
+    return 'unknown';
+  }
+  
+  function insertIntoTextArea(platform, text) {
+    let selector = null;
+    
+    // Platform-specific selectors (as of 2024)
+    switch (platform) {
+      case 'chatgpt':
+        selector = '#prompt-textarea, textarea[data-id="prompt-textarea"]';
+        break;
+      case 'claude':
+        selector = 'div[contenteditable="true"][data-placeholder], div.ProseMirror';
+        break;
+      case 'gemini':
+        selector = 'rich-textarea .ql-editor, .input-area textarea';
+        break;
+      default:
+        return false;
+    }
+    
+    const element = document.querySelector(selector);
+    if (!element) return false;
+    
+    // Handle different input types
+    if (element.tagName === 'TEXTAREA') {
+      // Standard textarea
+      element.value = element.value + '\n\n' + text;
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.focus();
+      // Move cursor to end
+      element.setSelectionRange(element.value.length, element.value.length);
+      return true;
+    } else if (element.contentEditable === 'true') {
+      // ContentEditable div (Claude)
+      const currentContent = element.innerText;
+      element.innerText = currentContent + '\n\n' + text;
+      element.dispatchEvent(new Event('input', { bubbles: true }));
+      element.focus();
+      // Move cursor to end
+      const range = document.createRange();
+      const selection = window.getSelection();
+      range.selectNodeContents(element);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return true;
+    }
+    
+    return false;
+  }
+  
+  function copyToClipboard(text) {
+    // Use modern clipboard API with fallback
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {
+        fallbackCopyToClipboard(text);
+      });
+    } else {
+      fallbackCopyToClipboard(text);
+    }
+  }
+  
+  function fallbackCopyToClipboard(text) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textarea);
+  }
+  
+  function showToast(message) {
+    const toast = document.createElement('div');
+    toast.className = 'aic-toast';
+    toast.textContent = message;
+    toast.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #333;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      z-index: 10001;
+      animation: slideIn 0.3s ease;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+      toast.style.animation = 'slideOut 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
   }
 
   // ============ BUTTON INJECTION ============

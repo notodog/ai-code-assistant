@@ -314,6 +314,141 @@ function isShellScript(code, ext) {
   5. Error → "❌ Failed (exit N)" with stderr and retry option
 - ESC or overlay click closes modal
 
+## 4.2.5 Enhanced Exec Modal with Copy-to-Reply
+
+The execute modal now includes a **Copy to Reply** feature that allows users to seamlessly insert execution results into AI chat conversations.
+
+### Execution Flow with Copy-to-Reply
+
+```
+User clicks Execute → Script runs → Output displayed → Copy-to-Reply button appears
+                                                         ↓
+                                    User clicks "Copy to Reply"
+                                                         ↓
+                        Platform detection (ChatGPT/Claude/Gemini)
+                                                         ↓
+                           Insert formatted output into chat input
+                                                         ↓
+                    Success toast OR fallback to clipboard copy
+```
+
+### Copy-to-Reply Implementation Details
+
+**Platform Detection:**
+- ChatGPT: `#prompt-textarea` or `textarea[data-id="prompt-textarea"]`
+- Claude: `div[contenteditable="true"]` with ProseMirror
+- Gemini: `rich-textarea .ql-editor` or `.input-area textarea`
+
+**Output Format:**
+```
+Command executed: [first line of script]...
+Working directory: /path/to/project
+Exit code: 0
+
+--- Output ---
+[stdout content]
+
+--- Errors ---
+[stderr content if any]
+```
+
+**Security Considerations:**
+- Output is sanitized before insertion
+- Clipboard API used with proper permissions
+- Fallback to legacy clipboard methods if needed
+
+**User Experience:**
+- Toast notifications for success/failure
+- Automatic cursor positioning at end of text
+- Modal closes after successful copy
+- Retry button for failed executions
+
+### Enhanced Modal Behavior
+
+**Pre-execution:**
+- Modal shows project selector, workdir display, timeout input
+- Script preview shows first 500 chars with line count
+- Execute button enabled, keyboard shortcuts active (Enter to execute, ESC to close)
+
+**During execution:**
+- Execute button disabled, shows "⏳ Executing..."
+- Message sent: `{ action: 'execute', command: code, working_dir: workdir, timeout_secs: timeout }`
+
+**Post-execution:**
+- Output section appears with stdout (green) and stderr (red)
+- Status shows exit code with appropriate icon
+- **NEW: Copy-to-Reply and Retry buttons appear**
+
+**Copy-to-Reply action:**
+- Formats execution results into markdown code block
+- Detects AI platform (ChatGPT/Claude/Gemini)
+- Inserts into appropriate text input
+- Falls back to clipboard if insertion fails
+- Shows toast notification
+- Closes modal on success
+
+### JavaScript Implementation Reference
+
+The copy-to-reply feature is implemented through these key functions:
+
+- `insertExecutionResultToChat(executionResult)` - Main orchestrator
+- `formatExecutionOutput(result)` - Formats output as markdown
+- `detectAIPlatform()` - Identifies ChatGPT/Claude/Gemini
+- `insertIntoTextArea(platform, text)` - Platform-specific insertion
+- `copyToClipboard(text)` - Fallback clipboard handler
+- `showToast(message)` - User feedback notifications
+
+### Modal HTML Structure
+
+```html
+<div id="aic-exec-output">
+  <h4>Output:</h4>
+  <pre id="aic-stdout" class="aic-stdout"></pre>
+  <pre id="aic-stderr" class="aic-stderr"></pre>
+  <div id="aic-status" class="aic-status"></div>
+  
+  <!-- NEW: Copy to Reply Section -->
+  <div id="aic-copy-reply">
+    <button id="aic-copy-to-reply" class="aic-modal-btn primary">
+      📋 Copy to Reply
+    </button>
+    <button id="aic-retry" class="aic-modal-btn secondary">
+      🔄 Retry
+    </button>
+  </div>
+</div>
+```
+
+### Testing Checklist
+
+1. **Build and install:**
+   ```bash
+   cd rust && cargo build --release
+   ./scripts/install.sh
+   # Load extension in Chrome
+   ```
+
+2. **Test execution flow:**
+   - Click exec button on shell script
+   - Verify modal shows correct project/workdir
+   - Execute a simple command (e.g., `echo "test"`)
+   - Confirm output displays correctly
+
+3. **Test copy-to-reply:**
+   - After execution, click "Copy to Reply"
+   - Verify text inserted into AI chat input
+   - Test on ChatGPT, Claude, and Gemini
+   - Test clipboard fallback by blocking textarea access
+
+4. **Test error handling:**
+   - Execute script that fails
+   - Verify stderr shown in red
+   - Test retry button functionality
+   - Test timeout enforcement
+
+5. **Test keyboard shortcuts:**
+   - ESC to close modal
+   - Enter to execute (when button enabled
 ---
 
 ### 4.3 Extension: `background.js`

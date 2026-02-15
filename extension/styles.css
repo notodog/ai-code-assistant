@@ -196,3 +196,75 @@
   background: #fee2e2;
   color: #991b1b;
 }
+
+/* Toast notification */
+.aic-toast {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.025em;
+}
+
+/* Copy-to-reply button styling */
+#aic-copy-to-reply {
+  background: #10b981;
+  transition: background 0.2s;
+}
+
+#aic-copy-to-reply:hover {
+  background: #059669;
+}
+
+#aic-retry {
+  background: #6b7280;
+}
+
+#aic-retry:hover {
+  background: #4b5563;
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Status indicators with better colors */
+.aic-status.success {
+  color: #10b981;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+.aic-status.error {
+  color: #ef4444;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+/* Enhanced output sections */
+.aic-stdout:not(:empty) {
+  border-left: 3px solid #10b981;
+}
+
+.aic-stderr:not(:empty) {
+  border-left: 3px solid #ef4444;
+}
