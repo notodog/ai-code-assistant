@@ -4,6 +4,16 @@
   "version": "0.4.0",
   "description": "Bridge AI-generated code directly into your development workflow",
   "permissions": ["activeTab", "storage", "nativeMessaging"],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://copilotstudio.microsoft.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://m365.cloud.microsoft/*",
+    "https://*.bing.com/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -13,11 +23,16 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://copilotstudio.microsoft.com/*",
-        "https://*.powerva.microsoft.com/*",
-        "https://chatgpt.com/*"
-      ],
+    "matches": [
+      "https://chat.openai.com/*",
+      "https://chatgpt.com/*",
+      "https://claude.ai/*",
+      "https://gemini.google.com/*",
+      "https://copilotstudio.microsoft.com/*",
+      "https://copilot.microsoft.com/*",
+      "https://m365.cloud.microsoft/*",
+      "https://*.bing.com/chat*"
+    ],
       "js": ["content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"

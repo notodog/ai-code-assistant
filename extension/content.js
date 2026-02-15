@@ -1,5 +1,48 @@
 // extension/content.js
 
+function debugFindChatInput() {
+  console.log('=== Debugging ChatGPT Input ===');
+  
+  // Try various possible selectors
+  const selectors = [
+    '#prompt-textarea',
+    'textarea[data-id="prompt-textarea"]',
+    'textarea[data-id="root"]',
+    'textarea[placeholder*="Message"]',
+    'textarea[placeholder*="Send"]',
+    'textarea.m-0',
+    'textarea.w-full',
+    'div[role="textbox"]',
+    'div[contenteditable="true"]',
+    '.text-base textarea',
+    'form textarea',
+    'main textarea'
+  ];
+  
+  selectors.forEach(selector => {
+    const element = document.querySelector(selector);
+    if (element) {
+      console.log(`✅ Found with: "${selector}"`, element);
+      console.log('  Tag:', element.tagName);
+      console.log('  Class:', element.className);
+      console.log('  ID:', element.id);
+      console.log('  Placeholder:', element.placeholder);
+    }
+  });
+  
+  // Also log all textareas on page
+  const allTextareas = document.querySelectorAll('textarea');
+  console.log(`\nFound ${allTextareas.length} textarea(s) total:`);
+  allTextareas.forEach((ta, i) => {
+    console.log(`Textarea ${i}:`, {
+      id: ta.id,
+      className: ta.className,
+      placeholder: ta.placeholder,
+      dataId: ta.dataset.id
+    });
+  });
+}
+
 (() => {
   const PROCESSED_ATTR = 'data-aic-processed';
 
@@ -810,9 +853,39 @@
           copyReplyDiv.style.gap = '8px';
   
           // Copy to Reply handler
-          overlay.querySelector('#aic-copy-to-reply').addEventListener('click', () => {
-            insertExecutionResultToChat(executionResult);
+          // overlay.querySelector('#aic-copy-to-reply').addEventListener('click', () => {
+          //   insertExecutionResultToChat(executionResult);
+          //   overlay.remove();
+          // });
+          // Copy to Reply handler
+          overlay.querySelector('#aic-copy-to-reply').addEventListener('click', async () => {
+            // Store the result before closing modal
+            const resultToInsert = executionResult;
+
+            // Close modal first
             overlay.remove();
+
+            // Small delay to let DOM settle
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Now insert with proper focus
+            const formattedOutput = formatExecutionOutput(resultToInsert);
+            const platform = detectAIPlatform();
+
+            try {
+              const inserted = await insertIntoTextArea(platform, formattedOutput);
+
+              if (inserted) {
+                showToast('✅ Execution result added to reply!');
+              } else {
+                copyToClipboard(formattedOutput);
+                showToast('📋 Execution result copied to clipboard!');
+              }
+            } catch (error) {
+              console.error('[AI Code Assistant] Insert error:', error);
+              copyToClipboard(formattedOutput);
+              showToast('📋 Execution result copied to clipboard!');
+            }
           });
   
           // Retry handler
@@ -980,63 +1053,260 @@
     output += '```';
     return output;
   }
-  
+
   function detectAIPlatform() {
     const hostname = window.location.hostname;
+    const url = window.location.href;
     
-    if (hostname.includes('chat.openai.com')) return 'chatgpt';
-    if (hostname.includes('claude.ai')) return 'claude';
-    if (hostname.includes('gemini.google.com')) return 'gemini';
+    console.log('[AI Code Assistant] Detecting platform for hostname:', hostname);
     
+    // ChatGPT detection
+    if (hostname === 'chat.openai.com' || 
+        hostname === 'chatgpt.com' ||
+        hostname.includes('openai.com')) {
+      return 'chatgpt';
+    }
+    
+    // Claude detection
+    if (hostname === 'claude.ai' || 
+        hostname.includes('claude.ai')) {
+      return 'claude';
+    }
+    
+    // Gemini detection
+    if (hostname === 'gemini.google.com' || 
+        hostname.includes('gemini.google.com')) {
+      return 'gemini';
+    }
+   
+    // Microsoft Copilot 365 detection
+    if (hostname === 'm365.cloud.microsoft' ||
+        hostname.includes('m365.cloud.microsoft') ||
+        url.includes('m365.cloud.microsoft/chat')) {
+      return 'm365copilot';
+    }
+
+    // Microsoft Copilot Studio detection
+    if (hostname === 'copilotstudio.microsoft.com' ||
+        hostname.includes('copilot.microsoft.com') ||
+        url.includes('copilotstudio.microsoft.com')) {
+      return 'copilotstudio';
+    }
+    
+    // Microsoft Copilot (Bing Chat) detection
+    if (hostname === 'copilot.microsoft.com' ||
+        hostname === 'www.bing.com' && url.includes('/chat')) {
+      return 'copilot';
+    }
+    
+    console.log('[AI Code Assistant] Unknown platform:', hostname);
     return 'unknown';
   }
-  
-  function insertIntoTextArea(platform, text) {
-    let selector = null;
+
+  async function insertIntoTextArea(platform, text) {
+    console.log('[AI Code Assistant] Inserting into platform:', platform);
     
-    // Platform-specific selectors (as of 2024)
+    let element = null;
+    
     switch (platform) {
       case 'chatgpt':
-        selector = '#prompt-textarea, textarea[data-id="prompt-textarea"]';
+        element = document.querySelector('main form textarea') || 
+                  document.querySelector('textarea[data-virtualkeyboard="true"]') ||
+                  document.querySelector('textarea[placeholder*="Ask"]');
         break;
+        
       case 'claude':
-        selector = 'div[contenteditable="true"][data-placeholder], div.ProseMirror';
+        element = document.querySelector('div[contenteditable="true"]');
         break;
+        
       case 'gemini':
-        selector = 'rich-textarea .ql-editor, .input-area textarea';
+        element = document.querySelector('rich-textarea .ql-editor') ||
+                  document.querySelector('.input-area textarea');
         break;
+        
+      case 'm365copilot':
+        // Microsoft 365 Copilot selectors
+        const m365Selectors = [
+          // Common M365 chat input selectors
+          'textarea[data-testid="chat-input"]',
+          'textarea[placeholder*="Ask"]',
+          'textarea[placeholder*="Type"]',
+          'textarea[placeholder*="message"]',
+          'textarea[aria-label*="Type a message"]',
+          'textarea[aria-label*="Chat"]',
+          // Fluent UI 2 components
+          '[data-automationid="textInput"] textarea',
+          '.ms-TextField-field textarea',
+          '.fui-Input__input',
+          '.fui-Textarea__textarea',
+          // Generic chat container selectors
+          '[role="textbox"]',
+          '[contenteditable="true"][role="textbox"]',
+          '.chat-input-container textarea',
+          '.message-box textarea',
+          // M365 specific
+          'div[class*="chatInput"] textarea',
+          'div[class*="messageBox"] textarea',
+          // Try any textarea in the chat area
+          '[data-testid*="chat"] textarea',
+          'div[class*="chat"] textarea'
+        ];
+        
+        for (const selector of m365Selectors) {
+          element = document.querySelector(selector);
+          if (element) {
+            console.log('[AI Code Assistant] Found M365 Copilot input with selector:', selector);
+            break;
+          }
+        }
+        
+        // If not found, try to find any visible textarea or contenteditable
+        if (!element) {
+          const allTextareas = document.querySelectorAll('textarea, [contenteditable="true"]');
+          for (const el of allTextareas) {
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+              element = el;
+              console.log('[AI Code Assistant] Using visible input as fallback:', el.tagName);
+              break;
+            }
+          }
+        }
+        break;
+        
+      case 'copilotstudio':
+        // Copilot Studio selectors (existing code)
+        const copilotSelectors = [
+          'textarea[data-testid="chat-input"]',
+          'textarea[placeholder*="Type"]',
+          'textarea[placeholder*="message"]',
+          'textarea[aria-label*="message"]',
+          'textarea[aria-label*="chat"]',
+          'main textarea',
+          '[role="main"] textarea',
+          '.chat-input textarea',
+          '.message-input textarea',
+          'div[data-testid="chat-panel"] textarea',
+          '.ms-TextField-field[type="text"]',
+          'input[role="textbox"]'
+        ];
+        
+        for (const selector of copilotSelectors) {
+          element = document.querySelector(selector);
+          if (element) {
+            console.log('[AI Code Assistant] Found Copilot Studio input with selector:', selector);
+            break;
+          }
+        }
+        break;
+        
+      case 'copilot':
+        // Microsoft Copilot (Bing Chat)
+        element = document.querySelector('#searchbox textarea') ||
+                  document.querySelector('textarea[placeholder*="Ask"]') ||
+                  document.querySelector('.cib-serp-main textarea');
+        break;
+        
       default:
+        console.log('[AI Code Assistant] Unknown platform');
         return false;
     }
     
-    const element = document.querySelector(selector);
-    if (!element) return false;
+    if (!element) {
+      console.log('[AI Code Assistant] No input element found');
+      return false;
+    }
     
-    // Handle different input types
-    if (element.tagName === 'TEXTAREA') {
-      // Standard textarea
-      element.value = element.value + '\n\n' + text;
-      element.dispatchEvent(new Event('input', { bubbles: true }));
+    console.log('[AI Code Assistant] Found element:', element.tagName, element.className);
+    
+    // Handle various input types
+    return insertIntoElement(element, text);
+  }
+  
+  function insertIntoElement(element, text) {
+    const currentValue = element.value || element.innerText || element.textContent || '';
+    const newValue = currentValue ? currentValue + '\n\n' + text : text;
+    
+    // Handle contentEditable elements
+    if (element.contentEditable === 'true' || element.getAttribute('role') === 'textbox') {
       element.focus();
-      // Move cursor to end
-      element.setSelectionRange(element.value.length, element.value.length);
-      return true;
-    } else if (element.contentEditable === 'true') {
-      // ContentEditable div (Claude)
-      const currentContent = element.innerText;
-      element.innerText = currentContent + '\n\n' + text;
-      element.dispatchEvent(new Event('input', { bubbles: true }));
+      
+      // For contentEditable, we need to handle it specially
+      if (element.contentEditable === 'true') {
+        // Clear and set new content
+        const selection = window.getSelection();
+        selection.selectAllChildren(element);
+        
+        // Try execCommand first
+        let success = document.execCommand('insertText', false, newValue);
+        
+        if (!success) {
+          // Fallback: set innerText/textContent
+          if ('innerText' in element) {
+            element.innerText = newValue;
+          } else {
+            element.textContent = newValue;
+          }
+          
+          // Dispatch input event
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        
+        // Move cursor to end
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        console.log('[AI Code Assistant] Inserted into contentEditable element');
+        return true;
+      }
+    }
+    
+    // Handle INPUT elements
+    if (element.tagName === 'INPUT') {
       element.focus();
-      // Move cursor to end
-      const range = document.createRange();
-      const selection = window.getSelection();
-      range.selectNodeContents(element);
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
+      element.select();
+      
+      let success = document.execCommand('insertText', false, newValue);
+      
+      if (!success) {
+        element.value = newValue;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      
+      if (element.setSelectionRange) {
+        element.setSelectionRange(newValue.length, newValue.length);
+      }
+      
+      console.log('[AI Code Assistant] Inserted into INPUT element');
       return true;
     }
     
+    // Handle TEXTAREA elements
+    if (element.tagName === 'TEXTAREA') {
+      element.focus();
+      element.select();
+      
+      const success = document.execCommand('insertText', false, newValue);
+      
+      if (success) {
+        element.setSelectionRange(newValue.length, newValue.length);
+        console.log('[AI Code Assistant] Successfully inserted via execCommand');
+      } else {
+        // Fallback
+        element.value = newValue;
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.setSelectionRange(newValue.length, newValue.length);
+        console.log('[AI Code Assistant] Inserted via fallback method');
+      }
+      
+      return true;
+    }
+    
+    console.log('[AI Code Assistant] Unknown element type:', element.tagName);
     return false;
   }
   
