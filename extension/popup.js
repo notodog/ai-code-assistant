@@ -13,6 +13,7 @@ const elements = {
   editId: document.getElementById('edit-id'),
   projectName: document.getElementById('project-name'),
   projectRoot: document.getElementById('project-root'),
+  projectWorkDir: document.getElementById('project-workdir'),
   addBtn: document.getElementById('add-project'),
   saveBtn: document.getElementById('form-save'),
   cancelBtn: document.getElementById('form-cancel'),
@@ -149,6 +150,7 @@ function showForm(title = 'Add Project', project = null) {
   elements.editId.value = project?.id || '';
   elements.projectName.value = project?.name || '';
   elements.projectRoot.value = project?.root || '';
+  elements.projectWorkDir.value = project?.root || '';
   elements.projectForm.classList.add('visible');
   elements.projectName.focus();
 }
@@ -158,11 +160,13 @@ function hideForm() {
   elements.editId.value = '';
   elements.projectName.value = '';
   elements.projectRoot.value = '';
+  elements.projectWorkDir.value = '';
 }
 
 async function saveProject() {
   const name = elements.projectName.value.trim();
   const root = elements.projectRoot.value.trim();
+  const workdir = elements.projectRoot.value.trim();
   const editId = elements.editId.value;
   
   // Validation
@@ -183,19 +187,30 @@ async function saveProject() {
     elements.projectRoot.focus();
     return;
   }
-  
+ 
+  // If workdir provided, validate it too
+  if (workdir && !workdir.startsWith('/')) {
+    alert('Working directory must be an absolute path (start with /)');
+    return;
+  }
+
   const { projects, defaultProject } = await getProjects();
   
   if (editId) {
     // Update existing
     const index = projects.findIndex(p => p.id === editId);
     if (index !== -1) {
-      projects[index] = { ...projects[index], name, root };
+      projects[index] = {
+        ...projects[index],
+        name,
+        root,
+        workdir: workdir || root
+      };
     }
   } else {
     // Add new
     const id = generateId(name);
-    projects.push({ id, name, root });
+    projects.push({ id, name, root, workdir: workdir || root});
     
     // If first project, set as default
     if (projects.length === 1) {

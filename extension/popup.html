@@ -303,7 +303,16 @@
       <label for="project-root">Root Path (absolute)</label>
       <input type="text" id="project-root" placeholder="/home/username/projects/my-app">
     </div>
-    
+  
+    <div>
+      <label>Working Directory (for executing scripts):
+        <small style="color: #666; display: block; margin-top: 4px;">
+          Leave empty to use root directory
+        </small>
+      </label>
+      <input type="text" id="project-workdir" placeholder="/home/user/projects/my-app">
+    </div>
+
     <div class="form-buttons">
       <button class="btn btn-secondary" id="form-cancel">Cancel</button>
       <button class="btn btn-primary" id="form-save">Save Project</button>

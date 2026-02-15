@@ -687,7 +687,7 @@
     chrome.storage.sync.get(['lastProject'], async (stored) => {
       const selectedProjectId = stored.lastProject || defaultProject || projects[0]?.id;
       const selectedProject = projects.find(p => p.id === selectedProjectId);
-      const workdir = selectedProject?.path || '/tmp';
+      const workdir = selectedProject?.workdir || selectedProject?.root || '/tmp';
   
       const projectOptions = projects.map(p =>
         `<option value="${p.id}" ${p.id === selectedProjectId ? 'selected' : ''}>${p.name}</option>`
@@ -700,12 +700,12 @@
         <div class="aic-modal">
           <h3>⚡ Execute Shell Script</h3>
           
-          <label>Project (for working directory):</label>
+          <label>Project:</label>
           <select id="aic-exec-project">${projectOptions}</select>
-          
-          <label>Working Directory:</label>
-          <input type="text" id="aic-exec-workdir" value="${workdir}" />
-          
+         
+          <div style="margin: 12px 0; padding: 8px; background: #333333; border-radius: 4px; font-size: 12px;">
+            <strong>Working Directory:</strong> <code id="aic-exec-workdir-display">${workdir}</code>
+          </div>
           <label>Script Preview (${lineCount} lines):</label>
           <pre class="aic-exec-preview">${preview}</pre>
           
@@ -731,14 +731,16 @@
       // Update workdir when project changes
       overlay.querySelector('#aic-exec-project').addEventListener('change', (e) => {
         const proj = projects.find(p => p.id === e.target.value);
-        if (proj) {
-          overlay.querySelector('#aic-exec-workdir').value = proj.path;
-        }
+        const newWorkdir = proj?.workdir || project?.root || '/tmp';
+        overlay.querySelector('#aic-exec-workdir-display').textContent = newWorkdir;
+        chrome.storage.sync.set({ lastProject: projectId });
       });
   
       // Execute button
       overlay.querySelector('#aic-execute').addEventListener('click', async () => {
-        const workdir = overlay.querySelector('#aic-exec-workdir').value;
+        const projectId = overlay.querySelector('#aic-exec-project').value;
+        const project = projects.find(p => p.id === projectId);
+        const workdir = project?.workdir || project?.root;
         const timeout = parseInt(overlay.querySelector('#aic-exec-timeout').value);
         const btn = overlay.querySelector('#aic-execute');
         
@@ -810,7 +812,15 @@
   // ============ BUTTON INJECTION ============
   
   function injectButton(preElement, index) {
+    // Skip if already processed
     if (preElement.hasAttribute(PROCESSED_ATTR)) return;
+    
+    // Skip if inside our modal (don't inject buttons on our own UI)
+    if (preElement.closest('.aic-modal-overlay')) return;
+    
+    // Skip if it's the exec preview element itself
+    if (preElement.classList.contains('aic-exec-preview')) return;
+    
     preElement.setAttribute(PROCESSED_ATTR, 'true');
   
     const codeEl = preElement.querySelector('code') || preElement;
@@ -840,14 +850,13 @@
       border: 1px solid rgba(0, 0, 0, 0.1);
       border-radius: 6px;
       cursor: pointer;
-      font-size: 14px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
       color: #333;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       transition: all 0.2s;
       z-index: 10;
-    `;
-  
+    `;  
     btn.addEventListener('mouseenter', () => {
       btn.style.background = 'rgba(255, 255, 255, 1)';
       btn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
