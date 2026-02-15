@@ -1,315 +1,325 @@
-<!-- README.md -->
 # AI Code Assistant
 
-**Version:** 0.4.0
+**Version:** 0.4.0  
+**Last Updated:** February 15, 2026
 
-A **browser extension + native host** toolchain that accelerates the flow of AI‑generated code into real projects. Save code blocks directly from Copilot Studio and Power Virtual Agents to your local filesystem with intelligent filename detection, project management, and cross‑device sync.
+A **browser extension + native host** toolchain that accelerates the flow of AI-generated code into real projects. Capture code blocks from ChatGPT or Claude, save them to disk with smart filename detection, and execute shell commands directly from your browser—all without leaving the AI conversation.
+
+---
+
+## Overview
+
+AI Code Assistant bridges the gap between AI-powered coding sessions and your local development environment. Instead of copying and pasting code snippets manually, this tool provides:
+
+- **One-click save**: Detect code blocks in AI chat interfaces, infer filenames and paths, and write directly to your project.
+- **In-browser execution**: Run shell commands (build, test, lint) from the chat UI and see output inline—ideal for iterative AI-assisted development.
+- **Project-aware workflows**: Manage multiple projects with persistent root paths, synced across Chrome sessions.
+
+**Architecture:** Cross-browser content script + background orchestration + Rust native host.  
+For deep technical details, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ---
 
 ## Features
 
-✨ **Smart Filename Detection** — 7 extraction strategies:
-- Markdown fenced block info strings (` ```rust main.rs `)
-- Inline file path references (`// src/main.rs`, `# path/to/file.py`)
-- Heading‑based context (`### Update config.toml`)
-- Language‑based defaults (`untitled.rs`, `untitled.py`, `untitled.js`)
-- Manual override in save modal
+### 1. Smart Code Save
+- **Filename inference**: Extracts filenames from code fences, surrounding text, or language tags.
+- **Path memory**: Remembers last-used paths per project; supports quick append or overwrite.
+- **Project management**: Store and switch between multiple project roots (synced via `chrome.storage.sync`).
+- **Safe writes**: Blocks directory traversal (`../`), enforces canonical containment within project root.
 
-💾 **Path Memory** — Remembers last‑used directory per project; proposes intelligent defaults for subsequent saves.
+### 2. Command Execution
+- **Shell runner**: Execute arbitrary commands in a chosen working directory.
+- **Timeout enforcement**: Configurable timeout (5–300s, default 30s); process killed on expiry with partial output returned.
+- **Inline feedback**: Success/error states with stdout/stderr displayed in modal.
+- **Project selector**: Pick from stored projects or provide a custom working directory.
 
-☁️ **Chrome Sync Storage** — Projects and preferences sync across devices via `chrome.storage.sync`.
-
-📦 **Export/Import** — Back up and restore project configurations as JSON.
-
-🎯 **Project Management** — CRUD operations for projects in a clean popup UI; switch active projects on the fly.
-
-🔒 **Safe File Operations** — Rust native host validates paths, creates directories automatically, and prevents traversal attacks.
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────┐
-│  Browser (Chrome/Edge)              │
-│  ┌─────────────────────────────┐   │
-│  │  Content Script             │   │
-│  │  • Detects code blocks      │   │
-│  │  • Injects save button      │   │
-│  │  • Opens modal UI           │   │
-│  └──────────┬──────────────────┘   │
-│             │ chrome.runtime       │
-│  ┌──────────▼──────────────────┐   │
-│  │  Background (Service Worker)│   │
-│  │  • Native messaging bridge  │   │
-│  └──────────┬──────────────────┘   │
-└─────────────┼────────────────────────┘
-              │ Native Messaging Protocol
-              │ (stdin/stdout, JSON frames)
-┌─────────────▼────────────────────────┐
-│  Native Host (Rust)                  │
-│  • Parses requests (Ping, Save)      │
-│  • Validates paths (absolute only)   │
-│  • Creates dirs, writes files        │
-│  • Returns success/error responses   │
-└──────────────┬───────────────────────┘
-               │
-┌──────────────▼───────────────────────┐
-│  Local Filesystem                    │
-│  ~/projects/my-project/src/main.rs   │
-└──────────────────────────────────────┘
-```
-
-**Components:**
-- **`extension/`** — Chrome Manifest V3 extension (content.js, background.js, popup.html/js, styles.css)
-- **`native-host/`** — Rust binary (`ai-code-host`) implementing Chrome Native Messaging
-- **`scripts/`** — Installation (`install.sh`) and diagnostics (`diagnose.sh`)
-- **`test/`** — Filename detection test harness (`content-test.html`)
+### 3. Configuration & Sync
+- **Export/Import**: Share project lists and settings across machines via JSON.
+- **Chrome sync**: Project data automatically synced when signed into Chrome.
+- **Protocol-based**: JSON over stdin/stdout for reliable extension ↔ native host communication.
 
 ---
 
 ## Installation
 
 ### Prerequisites
-- **Rust** (stable toolchain): [Install Rust](https://rustup.rs/)
-- **Chrome or Edge** (native messaging support required)
-- **Linux/macOS** (Snap Chromium not supported; see Known Issues)
+- **Rust toolchain**: Install from [rustup.rs](https://rustup.rs).
+- **Chrome/Chromium**: Manifest V3 compatible (≥ Chrome 88).
+- **OS**: Linux or macOS. **Windows support is planned but not yet implemented.**
 
-### Step 1: Install Rust
+> ⚠️ **Snap-packaged Chromium** does not support native messaging due to sandboxing restrictions. Use the `.deb` package from Google or a non-Snap build.
+
+---
+
+### Step 1: Build the Native Host
+
 ```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
+cd native-host
+cargo build --release
 ```
 
-### Step 2: Build and Install Native Host
+Binary output: `target/release/ai-code-host`
+
+---
+
+### Step 2: Install the Native Host
+
+Run the provided install script (auto-detects Snap Chromium and warns):
+
 ```bash
 ./scripts/install.sh
 ```
-This script:
-1. Builds `native-host` in release mode → `target/release/ccs-host`
-2. Copies binary to `~/.local/bin/ccs-host`
-3. Registers native messaging manifest:
-   - **Chrome:** `~/.config/google-chrome/NativeMessagingHosts/com.ccs.host.json`
-   - **Edge:** `~/.config/microsoft-edge/NativeMessagingHosts/com.ccs.host.json`
 
-**Verify installation:**
+**What it does:**
+1. Copies the binary to `~/.local/bin/ai-code-host`.
+2. Generates a native messaging manifest at:
+   - **Chrome:** `~/.config/google-chrome/NativeMessagingHosts/com.aicode.host.json`
+   - **Chromium:** `~/.config/chromium/NativeMessagingHosts/com.aicode.host.json`
+3. Validates the installation and checks for Snap packaging issues.
+
+**Manual installation (if needed):**
 ```bash
-which ccs-host
-# Should output: /home/youruser/.local/bin/ccs-host
-```
+# Copy binary
+cp target/release/ai-code-host ~/.local/bin/
 
-### Step 3: Load Chrome Extension
-1. Open `chrome://extensions/`
-2. Enable **Developer mode** (top-right toggle)
-3. Click **Load unpacked**
-4. Select the `extension/` directory
-5. Note the extension ID (e.g., `abcdefg...`)
+# Create manifest directory
+mkdir -p ~/.config/google-chrome/NativeMessagingHosts
 
-### Step 4: Update Native Messaging Manifest (if needed)
-If you changed the extension ID, edit:
-```bash
-~/.config/google-chrome/NativeMessagingHosts/com.ccs.host.json
-```
-Update the `"allowed_origins"` array:
-```json
+# Write manifest
+cat > ~/.config/google-chrome/NativeMessagingHosts/com.aicode.host.json <<EOF
 {
-  "name": "com.ccs.host",
-  "description": "AI Code Assistant native host",
-  "path": "/home/youruser/.local/bin/ccs-host",
+  "name": "com.aicode.host",
+  "description": "AI Code Assistant Native Host",
+  "path": "$HOME/.local/bin/ai-code-host",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://YOUR_EXTENSION_ID/"
   ]
 }
+EOF
 ```
+
+---
+
+### Step 3: Load the Extension
+
+1. Open Chrome and navigate to `chrome://extensions/`.
+2. Enable **Developer mode** (toggle in top-right corner).
+3. Click **Load unpacked** and select the `extension/` directory from this repo.
+4. Note the **Extension ID** (e.g., `abcdefghijklmnopqrstuvwxyz123456`).
+5. Update the native messaging manifest's `allowed_origins` field:
+   ```json
+   "allowed_origins": [
+     "chrome-extension://abcdefghijklmnopqrstuvwxyz123456/"
+   ]
+   ```
+6. Restart Chrome for the manifest change to take effect.
 
 ---
 
 ## Usage
 
-### Saving Code Blocks
-1. **Navigate** to a supported site (Copilot Studio, Power Virtual Agents).
-2. **Hover** over a code block → A **Save** button appears in the top-right corner.
+### Save Code Flow
+
+1. **Visit an AI chat** (ChatGPT, Claude, etc.) and generate code.
+2. **Hover over a code block** → A **💾 Save** button appears.
 3. **Click Save** → Modal opens with:
-   - **Project:** Select active project (or create new via popup)
-   - **Filename:** Auto-detected (editable)
-   - **Full path:** `{project_path}/{filename}`
-4. **Confirm** → Code is written to disk; success notification appears.
+   - **Inferred filename** (editable)
+   - **Project selector** (or custom path input)
+   - **Append/Overwrite** toggle
+4. **Confirm** → Native host writes the file and displays success/error.
+5. **Path memory**: The chosen path is stored; subsequent saves default to the same directory.
 
-### Managing Projects
-1. Click the **AI Code Assistant** extension icon (popup).
-2. **Add Project:**
-   - Enter **name** and **absolute path** (e.g., `/home/user/my-project`)
-   - Click **Add**; project appears in list
-3. **Set Active:**
-   - Click the radio button next to a project → It becomes the default save target
-4. **Edit/Delete:**
-   - Click **Edit** to modify path
-   - Click **Delete** to remove (with confirmation)
-5. **Export/Import:**
-   - **Export All** → Downloads `projects-backup.json`
-   - **Import** → Upload JSON to restore projects
-
-### Filename Detection Strategies (Priority Order)
-1. **Fenced block info string:** ` ```rust src/main.rs `
-2. **Inline comment:** `// src/config.rs` or `# lib/utils.py`
-3. **Heading context:** `### Update backend/api.ts`
-4. **Clipboard heuristic:** Pasted text containing file paths
-5. **Language extension:** `untitled.rs`, `untitled.py`, `untitled.js`
-6. **Generic fallback:** `untitled.txt`
-7. **Manual override:** Edit in the save modal
+**Example:**
+```javascript
+// Filename: utils.js
+function greet(name) {
+  return `Hello, ${name}!`;
+}
+```
+→ Click Save → Filename auto-filled as `utils.js` → Select project `MyApp` → Written to `/path/to/MyApp/utils.js`.
 
 ---
 
-## Configuration
+### Execute Command Flow
 
-**Storage:** All project data persists in `chrome.storage.sync` (syncs across signed-in Chrome instances).
+1. **Click the 🚀 Execute button** in the AI Code Assistant toolbar (or injected UI).
+2. **Execute modal opens** with:
+   - **Command input** (e.g., `cargo build`, `npm test`)
+   - **Working directory selector** (project or custom path)
+   - **Timeout** (default 30s, range 5–300s)
+3. **Click Run** → Native host spawns the process:
+   - **On success**: Modal displays stdout/stderr and exit code.
+   - **On timeout**: Process killed (including children), partial output returned with timeout error.
+   - **On error**: Modal shows error details (invalid path, permission denied, etc.).
+4. **Output** is displayed inline; modal can be closed and reopened to view history (session-only).
 
-**No local config file** (removed in v0.4.0; see Migration Notes).
+**Timeout Enforcement:**
+- Default: **30 seconds** (user-configurable per request).
+- Implementation: Native host uses `tokio::time::timeout` and `kill()` + `waitpid()` to ensure child processes are reaped.
+- If timeout expires, the response includes `"timeout": true` and any output captured before termination.
 
-**Permissions (manifest.json):**
-- `activeTab` — Access current tab for code block detection
-- `storage` — Persist projects and preferences
-- `nativeMessaging` — Communicate with Rust host
+**Security Considerations:**
+- **No shell interpretation by default**: Commands are executed directly (no `sh -c` wrapper) unless explicitly required.
+- **Working directory validation**: Must be an existing, absolute path; relative paths and traversal attempts are rejected.
+- **No implicit persistence**: Execute requests are stateless; no command history is logged to disk.
 
-**Supported Sites (content_scripts matches):**
-- `https://copilotstudio.microsoft.com/*`
-- `https://powerva.microsoft.com/*`
+---
+
+## Troubleshooting
+
+### Native Host Not Found
+
+**Symptoms:**
+- Extension shows "Native host connection failed" or "Native messaging host not found."
+
+**Solutions:**
+1. Verify the binary exists and is executable:
+   ```bash
+   ls -l ~/.local/bin/ai-code-host
+   chmod +x ~/.local/bin/ai-code-host
+   ```
+2. Check the manifest path matches your browser:
+   - Chrome: `~/.config/google-chrome/NativeMessagingHosts/com.aicode.host.json`
+   - Chromium: `~/.config/chromium/NativeMessagingHosts/com.aicode.host.json`
+3. Ensure `allowed_origins` in the manifest matches your extension ID.
+4. Restart Chrome completely (not just reload the extension).
+
+---
+
+### Snap Chromium Issues
+
+**Symptom:**
+- Native messaging fails with "Access denied" or no response from host.
+
+**Cause:**
+- Snap-packaged Chromium runs in a strict sandbox that blocks native messaging.
+
+**Solution:**
+- Uninstall Snap Chromium:
+  ```bash
+  sudo snap remove chromium
+  ```
+- Install the official `.deb` package:
+  ```bash
+  wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+  sudo dpkg -i google-chrome-stable_current_amd64.deb
+  ```
+- Or use a non-Snap Chromium build from your distro's repos.
+
+---
+
+### Permission Errors on Save/Execute
+
+**Symptoms:**
+- "Permission denied" when writing files or running commands.
+
+**Solutions:**
+1. Verify the project root and working directory are **writable**:
+   ```bash
+   ls -ld /path/to/project
+   ```
+2. Ensure the native host binary has execute permissions:
+   ```bash
+   chmod +x ~/.local/bin/ai-code-host
+   ```
+3. For execute: confirm the command itself is executable (e.g., `cargo`, `npm` in `$PATH`).
+
+---
+
+### Timeout Issues
+
+**Symptom:**
+- Commands are killed prematurely or timeout errors appear for fast commands.
+
+**Solutions:**
+1. Increase the timeout value in the Execute modal (max 300s).
+2. For long-running tasks, consider running them outside the extension or using a build tool.
+3. Check stderr output for clues if the command hangs (e.g., waiting for input).
 
 ---
 
 ## Known Issues
 
-### Snap Chromium Not Supported
-**Problem:** Snap-packaged Chromium cannot access `~/.config` for native messaging manifests.
+1. **Windows Not Supported**
+   - The native host uses Unix-specific process management (`fork`, `kill`, `waitpid`).
+   - Windows support requires porting to `std::process` or `winapi` equivalents.
+   - **Workaround:** Use WSL2 with Linux Chrome/Chromium.
 
-**Solution:**
-- Install Chrome/Edge via `.deb` package (Ubuntu/Debian):
-  ```bash
-  wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-  sudo dpkg -i google-chrome-stable_current_amd64.deb
-  ```
-- Or use a non-Snap browser build.
+2. **Snap Chromium Incompatible**
+   - Snap's strict confinement blocks native messaging.
+   - **Workaround:** Install non-Snap Chrome or Chromium (see Troubleshooting).
 
----
+3. **Execute History Not Persisted**
+   - Output from execute requests is session-only (not logged to disk or storage).
+   - **Future:** Add optional command history with user opt-in.
 
-## Migration Notes
-
-### Upgrading from v0.3.x to v0.4.0
-
-**Breaking Change:** Removed `~/.config/ai-code-assistant/projects.toml`.
-
-**Action Required:**
-1. **Export** your projects from v0.3.x (if available):
-   - Open popup → **Export All** → Save `projects-backup.json`
-2. **Upgrade** extension and native host:
-   ```bash
-   git pull
-   ./scripts/install.sh
-   ```
-3. **Import** projects:
-   - Open popup → **Import** → Select `projects-backup.json`
-
-**Why?** Chrome storage provides:
-- Cross-device sync
-- No filesystem dependencies
-- Better UX for add-ons in sandboxed environments
-
----
-
-## Development
-
-### Running Tests
-**Filename Detection Test Harness:**
-```bash
-open test/content-test.html
-```
-- Verify detection strategies against sample code blocks.
-
-### Diagnostics
-```bash
-./scripts/diagnose.sh
-```
-Checks:
-- Rust installation
-- Native host binary location
-- Native messaging manifest registration
-- Extension load status
-
-### Project Structure
-```
-.
-├── extension/
-│   ├── manifest.json       # Manifest V3 config
-│   ├── content.js          # Injects save button, detects filenames
-│   ├── background.js       # Native messaging bridge
-│   ├── popup.html          # Project management UI
-│   ├── popup.js            # CRUD logic for projects
-│   └── styles.css          # Modal and popup styles
-├── native-host/
-│   ├── Cargo.toml          # Rust dependencies (serde, serde_json)
-│   └── src/
-│       └── main.rs         # Native messaging protocol handler
-├── scripts/
-│   ├── install.sh          # Build and install native host
-│   └── diagnose.sh         # System diagnostic checks
-├── test/
-│   └── content-test.html   # Filename detection test page
-└── README.md               # This file
-```
-
-### Building Manually
-```bash
-cd native-host
-cargo build --release
-# Binary: target/release/ccs-host
-```
-
-### Debugging Native Host
-**Enable logging** (optional):
-```rust
-// In native-host/src/main.rs, add:
-eprintln!("Received request: {:?}", request);
-```
-Stderr logs appear in:
-```bash
-journalctl --user -u chrome  # systemd
-~/.xsession-errors            # X11
-```
+4. **Large Output Truncation**
+   - Stdout/stderr buffers may truncate for commands producing > 1MB output.
+   - **Mitigation:** Native host uses streaming buffers; future versions will support chunked responses.
 
 ---
 
 ## Future Enhancements
 
-Planned features (not yet implemented):
-- ⌨️ **Keyboard Shortcuts** — Quick-save, quick-append, quick-open-in-editor
-- 🔧 **Editor Integration** — Configurable "open in editor" command after save
-- 🌿 **Git Awareness** — Warn on dirty workspace, branch hints, optional auto-commit
-- 📦 **Batch Operations** — Save multiple blocks atomically as a change set
-- 🔍 **Dry-Run Mode** — Preview writes without touching disk
-- 🏪 **Chrome Web Store** — One-click installation
+- **Windows Support**: Port process management to cross-platform APIs.
+- **Batch Operations**: Save multiple code blocks as a change set with preview.
+- **Git Integration**: Warn on dirty workspace, optional auto-commit after save.
+- **Editor Hooks**: Configurable "open in editor" command after save.
+- **Keyboard Shortcuts**: Quick-save, quick-execute, and modal navigation.
+- **Dry-Run Mode**: Preview file writes and command execution without side effects.
+- **Smart Context**: Infer project root from `git` or language-specific config files.
 
-**Contributions welcome!** Open an issue or PR on GitHub.
+---
+
+## Architecture
+
+For a **deep technical dive**, including protocol schemas, message flows, timeout implementation, and security boundaries, see [`ARCHITECTURE.md`](ARCHITECTURE.md).
+
+**High-level stack:**
+- **Extension** (Manifest V3): Content script (UI injection) + background service worker (messaging orchestrator).
+- **Native Host** (Rust): Protocol parser, file I/O, subprocess executor, timeout enforcer.
+- **Protocol**: JSON frames over stdin/stdout with length-prefixed headers (Chrome native messaging format).
+
+---
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. **Open an issue** before starting major features or architectural changes.
+2. Follow the existing code style (Rust: `cargo fmt`; JS: project conventions).
+3. Add tests for new protocol actions or file path logic.
+4. Update `ARCHITECTURE.md` for protocol changes; update `README.md` for user-facing features.
+5. Ensure CI passes (if configured) or manually verify:
+   ```bash
+   cargo test --all
+   cargo clippy -- -D warnings
+   ```
+
+**Areas needing help:**
+- Windows native host port
+- Firefox/Edge extension ports
+- UI/UX polish (icons, animations, accessibility)
+- Automated integration tests (Puppeteer or similar)
 
 ---
 
 ## License
 
-*(Add your license here, e.g., MIT, Apache-2.0)*
+**MIT License** (or specify your chosen license).
+
+See [`LICENSE`](LICENSE) for full text.
 
 ---
 
-## Support
+## Questions or Issues?
 
-**Issues?** Run diagnostics first:
-```bash
-./scripts/diagnose.sh
-```
-
-**Questions?** Open an issue or contact the maintainer.
+- **Bug reports:** Open an issue with logs, OS, Chrome version, and steps to reproduce.
+- **Feature requests:** Describe the use case and how it fits into the AI→code workflow.
+- **Security concerns:** Please report privately to the maintainer before public disclosure.
 
 ---
 
-**Version:** 0.4.0  
-**Last Updated:** 2026-02-15
+**Happy coding with AI! 🚀**

@@ -138,8 +138,8 @@ User selects project, workdir, timeout → clicks "Execute"
 sendMessage to background → sendNativeMessage({
   action: "execute",
   code: "#!/bin/bash\necho 'hello'",
-  workdir: "/absolute/path/to/workdir",
-  timeout: 30
+  working_dir: "/absolute/path/to/workdir",
+  timeout_secs: 30
 })
   ↓
 Rust host (PLANNED) → spawns shell process → captures stdout/stderr → enforces timeout
@@ -558,8 +558,8 @@ fn save_file(path: &str, content: &str, project_root: &str) -> Result<(), String
 {
   "action": "execute",
   "code": "#!/bin/bash\necho 'Hello from shell'\nls -la",
-  "workdir": "/home/user/projects/my-app",
-  "timeout": 30
+  "working_dir": "/home/user/projects/my-app",
+  "timeout_secs": 30
 }
 ```
 
@@ -1007,7 +1007,7 @@ print('Hello')</code></pre>
 
 ### 10.1 High Priority
 
-- [ ] **Complete Execute action in Rust**
+- [x] **Complete Execute action in Rust**
   - Spawn process with timeout
   - Capture stdout/stderr
   - Add workdir validation

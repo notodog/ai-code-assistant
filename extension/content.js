@@ -750,9 +750,9 @@
         try {
           const response = await sendNativeMessage({
             action: 'execute',
-            code: code,
-            workdir: workdir,
-            timeout: timeout
+            command: code,
+            working_dir: workdir,
+            timeout_secs: timeout
           });
   
           // Show output section

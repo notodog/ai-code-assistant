@@ -1,7 +1,12 @@
+// native-host/src/main.rs
+
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
+use std::time::Duration;
+use wait_timeout::ChildExt;
 
 // ============ PROTOCOL ============
 
@@ -10,8 +15,19 @@ use std::path::PathBuf;
 enum Request {
     /// Write content to an absolute path
     Save { path: String, content: String },
+    /// Execute a shell command in a working directory with optional timeout
+    Execute {
+        command: String,
+        working_dir: String,
+        #[serde(default = "default_timeout")]
+        timeout_secs: u64,
+    },
     /// Connection test
     Ping,
+}
+
+fn default_timeout() -> u64 {
+    30 // 30 seconds default
 }
 
 #[derive(Debug, Serialize)]
@@ -21,6 +37,17 @@ enum Response {
         success: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         full_path: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
+    ExecuteResult {
+        success: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stdout: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stderr: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        exit_code: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>,
     },
@@ -103,6 +130,115 @@ fn handle_save(abs_path: &str, content: &str) -> Response {
     }
 }
 
+fn handle_execute(command: &str, working_dir: &str, timeout_secs: u64) -> Response {
+    let work_dir = PathBuf::from(working_dir);
+
+    // Validation: working_dir must be absolute
+    if !work_dir.is_absolute() {
+        return Response::ExecuteResult {
+            success: false,
+            stdout: None,
+            stderr: None,
+            exit_code: None,
+            error: Some("Working directory must be absolute".to_string()),
+        };
+    }
+
+    // Validation: working_dir must exist
+    if !work_dir.exists() {
+        return Response::ExecuteResult {
+            success: false,
+            stdout: None,
+            stderr: None,
+            exit_code: None,
+            error: Some(format!("Working directory does not exist: {}", working_dir)),
+        };
+    }
+
+    // Spawn command via shell
+    let mut child = match Command::new("/bin/sh")
+        .arg("-c")
+        .arg(command)
+        .current_dir(&work_dir)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(e) => {
+            return Response::ExecuteResult {
+                success: false,
+                stdout: None,
+                stderr: None,
+                exit_code: None,
+                error: Some(format!("Failed to spawn command: {}", e)),
+            }
+        }
+    };
+
+    // Wait with timeout
+    let timeout_duration = Duration::from_secs(timeout_secs);
+    match child.wait_timeout(timeout_duration) {
+        Ok(Some(status)) => {
+            // Command completed within timeout
+            let output = child.wait_with_output().unwrap_or_else(|e| {
+                eprintln!("Warning: failed to capture output after wait: {}", e);
+                std::process::Output {
+                    status,
+                    stdout: Vec::new(),
+                    stderr: Vec::new(),
+                }
+            });
+
+            let stdout_str = String::from_utf8_lossy(&output.stdout).to_string();
+            let stderr_str = String::from_utf8_lossy(&output.stderr).to_string();
+
+            Response::ExecuteResult {
+                success: status.success(),
+                stdout: if stdout_str.is_empty() {
+                    None
+                } else {
+                    Some(stdout_str)
+                },
+                stderr: if stderr_str.is_empty() {
+                    None
+                } else {
+                    Some(stderr_str)
+                },
+                exit_code: status.code(),
+                error: None,
+            }
+        }
+        Ok(None) => {
+            // Timeout occurred - kill the process
+            let _ = child.kill();
+            let _ = child.wait(); // Clean up zombie
+
+            Response::ExecuteResult {
+                success: false,
+                stdout: None,
+                stderr: None,
+                exit_code: None,
+                error: Some(format!(
+                    "Command timed out after {} seconds",
+                    timeout_secs
+                )),
+            }
+        }
+        Err(e) => {
+            // Wait failed
+            let _ = child.kill();
+            Response::ExecuteResult {
+                success: false,
+                stdout: None,
+                stderr: None,
+                exit_code: None,
+                error: Some(format!("Failed to wait for command: {}", e)),
+            }
+        }
+    }
+}
+
 fn handle_ping() -> Response {
     Response::Pong { success: true }
 }
@@ -118,6 +254,11 @@ fn main() {
 
         let response = match request {
             Request::Save { path, content } => handle_save(&path, &content),
+            Request::Execute {
+                command,
+                working_dir,
+                timeout_secs,
+            } => handle_execute(&command, &working_dir, timeout_secs),
             Request::Ping => handle_ping(),
         };
 
