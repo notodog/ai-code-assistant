@@ -1,13 +1,13 @@
 #!/bin/bash
 set -e
 
-echo "Building ccs-host..."
+echo "Building ai-code-host..."
 cargo build --release
 
 echo "Installing binary..."
 mkdir -p ~/bin
-cp target/release/ccs-host ~/bin/
-chmod +x ~/bin/ccs-host
+cp target/release/ai-code-host ~/bin/
+chmod +x ~/bin/ai-code-host
 
 echo "Installing native messaging manifest..."
 MANIFEST_DIR=""
@@ -25,11 +25,11 @@ mkdir -p "$MANIFEST_DIR"
 # Get extension ID (user must fill this in)
 read -p "Enter your extension ID (from chrome://extensions): " EXT_ID
 
-cat > "$MANIFEST_DIR/com.ccs.host.json" << EOF
+cat > "$MANIFEST_DIR/com.aicode.host.json" << EOF
 {
-  "name": "com.ccs.host",
-  "description": "Copilot Code Saver Native Host",
-  "path": "$HOME/bin/ccs-host",
+  "name": "com.aicode.host",
+  "description": "AI Code Assistant native messaging host",
+  "path": "$HOME/bin/ai-code-host",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://$EXT_ID/"
@@ -37,16 +37,9 @@ cat > "$MANIFEST_DIR/com.ccs.host.json" << EOF
 }
 EOF
 
-echo "Creating default config..."
-mkdir -p ~/.config/copilot-code-saver
-if [ ! -f ~/.config/copilot-code-saver/projects.toml ]; then
-    cp config.example.toml ~/.config/copilot-code-saver/projects.toml
-    echo "Edit ~/.config/copilot-code-saver/projects.toml to add your projects"
-fi
-
 echo ""
 echo "✓ Installation complete!"
 echo ""
 echo "Next steps:"
-echo "1. Edit ~/.config/copilot-code-saver/projects.toml"
-echo "2. Reload the extension in Chrome"
+echo "1. Reload the extension in Chrome"
+echo "2. Add projects in the extension popup dialog"

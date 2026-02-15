@@ -27,12 +27,20 @@
   color: #333;
 }
 
+.aic-modal h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333333;       /* Dark text for subheading */
+}
+
 .aic-modal label {
   display: block;
   font-size: 12px;
   font-weight: 500;
   color: #666;
   margin-bottom: 4px;
+  margin-top: 8px;
 }
 
 .aic-modal input,
@@ -44,12 +52,32 @@
   border-radius: 6px;
   font-size: 13px;
   box-sizing: border-box;
+  background: #ffffff;  /* Explicit white background */
+  color: #333333;       /* Explicit dark text */
 }
 
 .aic-modal input:focus,
 .aic-modal select:focus {
   outline: none;
   border-color: #0078d4;
+  background: #ffffff;  /* Keep white on focus */
+  color: #333333;       /* Keep dark text on focus */
+}
+
+.aic-modal input::placeholder {
+  color: #999999;       /* Lighter color for placeholder text */
+}
+
+/* Ensure select dropdown options are visible */
+.aic-modal select option {
+  background: #ffffff;
+  color: #333333;
+}
+
+/* Number input specific styling */
+.aic-modal input[type="number"] {
+  background: #ffffff;
+  color: #333333;
 }
 
 .aic-detected {
@@ -106,4 +134,65 @@
 
 .aic-modal-btn.secondary:hover {
   background: #e0e0e0;
+}
+
+/* Execute modal styles */
+.aic-exec-preview {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 12px;
+  border-radius: 6px;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin-bottom: 12px;
+  border: 1px solid #333;
+}
+
+.aic-stdout {
+  background: #1e3a1e;
+  color: #4ade80;
+  padding: 12px;
+  border-radius: 6px;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  margin-bottom: 8px;
+  border: 1px solid #2d5a2d;
+}
+
+.aic-stderr {
+  background: #3a1e1e;
+  color: #f87171;
+  padding: 12px;
+  border-radius: 6px;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  margin-bottom: 8px;
+  border: 1px solid #5a2d2d;
+}
+
+.aic-status {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.aic-status.success {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.aic-status.error {
+  background: #fee2e2;
+  color: #991b1b;
 }

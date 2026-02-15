@@ -1,359 +1,315 @@
-# Copilot Code Saver
+<!-- README.md -->
+# AI Code Assistant
 
-A Chrome/Chromium browser extension that saves code blocks from AI assistants (like Microsoft Copilot Studio) directly to your project files — no more copy-paste hell.
+**Version:** 0.4.0
 
-## 🎯 Problem Solved
+A **browser extension + native host** toolchain that accelerates the flow of AI‑generated code into real projects. Save code blocks directly from Copilot Studio and Power Virtual Agents to your local filesystem with intelligent filename detection, project management, and cross‑device sync.
 
-When using web-based AI coding assistants without API access, developers face a tedious workflow:
-1. Copy code from browser
-2. Switch to terminal/editor
-3. Paste and save to file
-4. Repeat dozens of times per session
+---
 
-**Copilot Code Saver** adds a "Save" button to every code block, letting you save directly to your project directory with smart filename detection.
+## Features
 
-## ✨ Features
+✨ **Smart Filename Detection** — 7 extraction strategies:
+- Markdown fenced block info strings (` ```rust main.rs `)
+- Inline file path references (`// src/main.rs`, `# path/to/file.py`)
+- Heading‑based context (`### Update config.toml`)
+- Language‑based defaults (`untitled.rs`, `untitled.py`, `untitled.js`)
+- Manual override in save modal
 
-- **One-click save** — Save button on every code block
-- **Smart filename detection** — Automatically detects filenames from context, comments, and code structure
-- **Multi-project support** — Configure projects in the extension popup
-- **Direct filesystem writes** — Files go straight to your project (not Downloads)
-- **Language detection** — Auto-detects file extension from code highlighting
-- **Path memory** — Remembers last used directory per project
-- **Confidence indicators** — Shows how confident the detection is (high/medium/low)
-- **Export/Import config** — Backup and restore your project configuration
-- **Cross-device sync** — Projects stored in Chrome sync storage
+💾 **Path Memory** — Remembers last‑used directory per project; proposes intelligent defaults for subsequent saves.
 
-## 🧠 Smart Filename Detection
+☁️ **Chrome Sync Storage** — Projects and preferences sync across devices via `chrome.storage.sync`.
 
-The extension uses multiple strategies to detect the correct filename, in priority order:
+📦 **Export/Import** — Back up and restore project configurations as JSON.
 
-| Priority | Strategy | Example |
-|----------|----------|---------|
-| 1 | **Code block header** | UI elements showing filename above code |
-| 2 | **Conversation context** | "save this as `utils.rs`", "update your `config.toml`" |
-| 3 | **First-line comment** | `// src/utils.rs` or `# filename: app.py` |
-| 4 | **Code structure** | `fn main()` → `main.rs`, `[package]` → `Cargo.toml` |
-| 5 | **Markdown headers** | `### utils.rs` or `**config.toml**` |
-| 6 | **Smart extraction** | Extracts function/class names from code |
-| 7 | **Fallback** | `snippet-{timestamp}.{ext}` |
+🎯 **Project Management** — CRUD operations for projects in a clean popup UI; switch active projects on the fly.
 
-### Code Structure Recognition
+🔒 **Safe File Operations** — Rust native host validates paths, creates directories automatically, and prevents traversal attacks.
 
-| Pattern | Detected Filename |
-|---------|-------------------|
-| `fn main()` (Rust) | `main.rs` |
-| `if __name__ == "__main__"` (Python) | `main.py` |
-| `package main` (Go) | `main.go` |
-| `[package]` (TOML) | `Cargo.toml` |
-| `{"name":..., "version":...}` (JSON) | `package.json` |
-| `{"compilerOptions":...}` (JSON) | `tsconfig.json` |
-| `<!DOCTYPE html>` | `index.html` |
-| `FROM ...` (Dockerfile) | `Dockerfile` |
-| `export default function Button` | `Button.jsx` |
-| `class UserController` | `user_controller.py` |
-| `pub struct MyStruct` | `my_struct.rs` |
+---
 
-### Path Memory
-
-The extension remembers your last used directory for each project. If you save a file to `src/components/Button.jsx`, the next save will default to `src/components/`.
-
-## 🏗️ Architecture
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    BROWSER EXTENSION                            │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
-│  │ content.js  │  │background.js│  │ popup.html/js           │ │
-│  │             │  │             │  │ (Project Management)    │ │
-│  │ - Injects   │  │ - Bridges   │  │                         │ │
-│  │   save btn  │  │   content ↔ │  │ - Add/Edit/Delete       │ │
-│  │ - Smart     │  │   native    │  │   projects              │ │
-│  │   filename  │  │   host      │  │ - Set default project   │ │
-│  │   detection │  │             │  │ - Export/Import config  │ │
-│  │ - Shows     │  │             │  │                         │ │
-│  │   modal     │  │             │  │                         │ │
-│  └──────┬──────┘  └──────┬──────┘  └─────────────────────────┘ │
-│         │                │                                      │
-│         │ chrome.storage │                                      │
-│         │ (projects +    │                                      │
-│         │  recent paths) │                                      │
-└─────────┼────────────────┼──────────────────────────────────────┘
-          │                │
-          │   Chrome       │  Native Messaging
-          │   Runtime      │  (stdio)
-          │   Messages     │
-          │                ▼
-          │  ┌─────────────────────────────────────────────────────┐
-          │  │              NATIVE HOST (Rust)                     │
-          │  │  - Stateless file writer                            │
-          │  │  - Receives { path, content }                       │
-          │  │  - Writes file to filesystem                        │
-          │  │  - Returns success/error                            │
-          │  └─────────────────────────────────────────────────────┘
-          │                │
-          │                ▼
-          │  ┌─────────────────────────────────────────────────────┐
-          │  │              FILESYSTEM                             │
-          │  │  ~/prj/my-app/src/utils.rs                          │
-          │  │  ~/.dotfiles/config.toml                            │
-          │  │  ~/bin/script.sh                                    │
-          │  └─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────┐
+│  Browser (Chrome/Edge)              │
+│  ┌─────────────────────────────┐   │
+│  │  Content Script             │   │
+│  │  • Detects code blocks      │   │
+│  │  • Injects save button      │   │
+│  │  • Opens modal UI           │   │
+│  └──────────┬──────────────────┘   │
+│             │ chrome.runtime       │
+│  ┌──────────▼──────────────────┐   │
+│  │  Background (Service Worker)│   │
+│  │  • Native messaging bridge  │   │
+│  └──────────┬──────────────────┘   │
+└─────────────┼────────────────────────┘
+              │ Native Messaging Protocol
+              │ (stdin/stdout, JSON frames)
+┌─────────────▼────────────────────────┐
+│  Native Host (Rust)                  │
+│  • Parses requests (Ping, Save)      │
+│  • Validates paths (absolute only)   │
+│  • Creates dirs, writes files        │
+│  • Returns success/error responses   │
+└──────────────┬───────────────────────┘
+               │
+┌──────────────▼───────────────────────┐
+│  Local Filesystem                    │
+│  ~/projects/my-project/src/main.rs   │
+└──────────────────────────────────────┘
 ```
 
-### Key Design Decisions
+**Components:**
+- **`extension/`** — Chrome Manifest V3 extension (content.js, background.js, popup.html/js, styles.css)
+- **`native-host/`** — Rust binary (`ai-code-host`) implementing Chrome Native Messaging
+- **`scripts/`** — Installation (`install.sh`) and diagnostics (`diagnose.sh`)
+- **`test/`** — Filename detection test harness (`content-test.html`)
 
-| Aspect | Description |
-|--------|-------------|
-| **Project config in extension** | Stored in `chrome.storage.sync`, not filesystem. Works regardless of sandbox restrictions. |
-| **Stateless native host** | Only handles file I/O. Receives absolute paths, no config parsing needed. |
-| **Path resolution in extension** | Extension joins project root + relative path before sending to native host. |
-| **Smart detection** | Multiple strategies with confidence scoring to minimize manual input. |
+---
 
-## 📁 Project Structure
-
-```
-copilot-code-saver/
-├── extension/
-│   ├── manifest.json      # Extension manifest (Manifest V3)
-│   ├── content.js         # Injected into Copilot pages (smart detection)
-│   ├── background.js      # Service worker for native messaging
-│   ├── popup.html         # Project management UI
-│   ├── popup.js           # Project CRUD logic
-│   └── styles.css         # Modal styles
-│
-├── native-host/
-│   ├── Cargo.toml         # Rust dependencies
-│   ├── src/
-│   │   └── main.rs        # Native messaging host (file writer)
-│   └── install.sh         # Installation script
-│
-└── README.md
-```
-
-## 🚀 Installation
+## Installation
 
 ### Prerequisites
+- **Rust** (stable toolchain): [Install Rust](https://rustup.rs/)
+- **Chrome or Edge** (native messaging support required)
+- **Linux/macOS** (Snap Chromium not supported; see Known Issues)
 
-- **Rust** (for building native host): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-- **Google Chrome** or **Chromium** (non-snap version — see [Known Issues](#-known-issues))
-
-### Step 1: Clone Repository
-
+### Step 1: Install Rust
 ```bash
-git clone https://github.com/yourusername/copilot-code-saver.git
-cd copilot-code-saver
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
 ```
 
-### Step 2: Run Installation Script
- 
+### Step 2: Build and Install Native Host
 ```bash
 ./scripts/install.sh
 ```
+This script:
+1. Builds `native-host` in release mode → `target/release/ccs-host`
+2. Copies binary to `~/.local/bin/ccs-host`
+3. Registers native messaging manifest:
+   - **Chrome:** `~/.config/google-chrome/NativeMessagingHosts/com.ccs.host.json`
+   - **Edge:** `~/.config/microsoft-edge/NativeMessagingHosts/com.ccs.host.json`
 
-### Step 3: Register Native Messaging Host
-
+**Verify installation:**
 ```bash
-# Create manifest directory
-mkdir -p ~/.config/google-chrome/NativeMessagingHosts
-# Or for Chromium:
-# mkdir -p ~/.config/chromium/NativeMessagingHosts
+which ccs-host
+# Should output: /home/youruser/.local/bin/ccs-host
+```
 
-# Create manifest file
-cat > ~/.config/google-chrome/NativeMessagingHosts/com.ccs.host.json << EOF
+### Step 3: Load Chrome Extension
+1. Open `chrome://extensions/`
+2. Enable **Developer mode** (top-right toggle)
+3. Click **Load unpacked**
+4. Select the `extension/` directory
+5. Note the extension ID (e.g., `abcdefg...`)
+
+### Step 4: Update Native Messaging Manifest (if needed)
+If you changed the extension ID, edit:
+```bash
+~/.config/google-chrome/NativeMessagingHosts/com.ccs.host.json
+```
+Update the `"allowed_origins"` array:
+```json
 {
   "name": "com.ccs.host",
-  "description": "Copilot Code Saver native host",
-  "path": "$HOME/bin/ccs-host",
+  "description": "AI Code Assistant native host",
+  "path": "/home/youruser/.local/bin/ccs-host",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://YOUR_EXTENSION_ID/"
   ]
 }
-EOF
 ```
 
-> **Note:** Replace `YOUR_EXTENSION_ID` with the actual extension ID after loading (Step 4).
+---
 
-### Step 4: Load Extension
+## Usage
 
-1. Open Chrome/Chromium
-2. Navigate to `chrome://extensions/`
-3. Enable "Developer mode" (top right)
-4. Click "Load unpacked"
-5. Select the `extension/` folder
-6. **Copy the Extension ID** and update the native messaging manifest (Step 3)
+### Saving Code Blocks
+1. **Navigate** to a supported site (Copilot Studio, Power Virtual Agents).
+2. **Hover** over a code block → A **Save** button appears in the top-right corner.
+3. **Click Save** → Modal opens with:
+   - **Project:** Select active project (or create new via popup)
+   - **Filename:** Auto-detected (editable)
+   - **Full path:** `{project_path}/{filename}`
+4. **Confirm** → Code is written to disk; success notification appears.
 
-### Step 5: Configure Projects
+### Managing Projects
+1. Click the **AI Code Assistant** extension icon (popup).
+2. **Add Project:**
+   - Enter **name** and **absolute path** (e.g., `/home/user/my-project`)
+   - Click **Add**; project appears in list
+3. **Set Active:**
+   - Click the radio button next to a project → It becomes the default save target
+4. **Edit/Delete:**
+   - Click **Edit** to modify path
+   - Click **Delete** to remove (with confirmation)
+5. **Export/Import:**
+   - **Export All** → Downloads `projects-backup.json`
+   - **Import** → Upload JSON to restore projects
 
-1. Click the extension icon in the toolbar
-2. Click "+ Add" to add a project
-3. Enter project name and absolute root path
-4. Click "Save Project"
+### Filename Detection Strategies (Priority Order)
+1. **Fenced block info string:** ` ```rust src/main.rs `
+2. **Inline comment:** `// src/config.rs` or `# lib/utils.py`
+3. **Heading context:** `### Update backend/api.ts`
+4. **Clipboard heuristic:** Pasted text containing file paths
+5. **Language extension:** `untitled.rs`, `untitled.py`, `untitled.js`
+6. **Generic fallback:** `untitled.txt`
+7. **Manual override:** Edit in the save modal
 
-## 📖 Usage
+---
 
-1. Go to [Microsoft Copilot Studio](https://copilotstudio.microsoft.com/)
-2. Chat with your AI assistant to generate code
-3. Hover over any code block — a save button (↓) appears in the bottom-right
-4. Click the save button
-5. The filename is auto-detected — edit if needed, then click Save
-6. File is written directly to your project!
+## Configuration
 
-### Tips for Better Detection
+**Storage:** All project data persists in `chrome.storage.sync` (syncs across signed-in Chrome instances).
 
-To help the extension detect filenames more accurately:
+**No local config file** (removed in v0.4.0; see Migration Notes).
 
-1. **Ask the AI to include the filename** — "Create a file called `utils.rs`"
-2. **Use backticks around filenames** — The extension looks for `` `filename.ext` ``
-3. **Add a comment at the top** — `// src/utils.rs` or `# filename: app.py`
-4. **Use standard patterns** — `fn main()` will auto-detect as `main.rs`
+**Permissions (manifest.json):**
+- `activeTab` — Access current tab for code block detection
+- `storage` — Persist projects and preferences
+- `nativeMessaging` — Communicate with Rust host
 
-## 🔧 Configuration
+**Supported Sites (content_scripts matches):**
+- `https://copilotstudio.microsoft.com/*`
+- `https://powerva.microsoft.com/*`
 
-### Project Management
+---
 
-All project configuration is done through the extension popup:
+## Known Issues
 
-| Action | How |
-|--------|-----|
-| Add project | Click "+ Add", fill form, click "Save Project" |
-| Edit project | Click ✏️ on any project |
-| Delete project | Click 🗑️ on any project |
-| Set default | Click ⭐ on any project |
-| Export config | Click "Export" in footer — downloads JSON |
-| Import config | Click "Import" in footer — select JSON file |
+### Snap Chromium Not Supported
+**Problem:** Snap-packaged Chromium cannot access `~/.config` for native messaging manifests.
 
-### Supported AI Chat Sites
+**Solution:**
+- Install Chrome/Edge via `.deb` package (Ubuntu/Debian):
+  ```bash
+  wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+  sudo dpkg -i google-chrome-stable_current_amd64.deb
+  ```
+- Or use a non-Snap browser build.
 
-Edit `extension/manifest.json` to add more sites:
+---
 
-```json
-"content_scripts": [
-  {
-    "matches": [
-      "https://copilotstudio.microsoft.com/*",
-      "https://*.powerva.microsoft.com/*",
-      "https://chat.openai.com/*",
-      "https://claude.ai/*"
-    ],
-    ...
-  }
-]
-```
+## Migration Notes
 
-After editing, reload the extension in `chrome://extensions/`.
+### Upgrading from v0.3.x to v0.4.0
 
-## ⚠️ Known Issues
+**Breaking Change:** Removed `~/.config/ai-code-assistant/projects.toml`.
 
-### Snap Chromium Does Not Support Native Messaging
+**Action Required:**
+1. **Export** your projects from v0.3.x (if available):
+   - Open popup → **Export All** → Save `projects-backup.json`
+2. **Upgrade** extension and native host:
+   ```bash
+   git pull
+   ./scripts/install.sh
+   ```
+3. **Import** projects:
+   - Open popup → **Import** → Select `projects-backup.json`
 
-**Problem:** Native messaging doesn't work in browsers installed as snap packages (Ubuntu's default Chromium). The snap sandbox prevents execution of external binaries.
+**Why?** Chrome storage provides:
+- Cross-device sync
+- No filesystem dependencies
+- Better UX for add-ons in sandboxed environments
 
-**Error:** `"Specified native messaging host not found"`
+---
 
-**Solution:** Install Google Chrome or Chromium from a non-snap source:
+## Development
 
+### Running Tests
+**Filename Detection Test Harness:**
 ```bash
-# Option 1: Google Chrome .deb
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-sudo dpkg -i google-chrome-stable_current_amd64.deb
-sudo apt --fix-broken install
-
-# Option 2: Chromium from PPA
-sudo add-apt-repository ppa:saiarcot895/chromium-dev
-sudo apt update
-sudo apt install chromium-browser
+open test/content-test.html
 ```
+- Verify detection strategies against sample code blocks.
 
-| Browser Install Method | Native Messaging |
-|------------------------|------------------|
-| Chromium snap          | ❌ Blocked       |
-| Google Chrome .deb     | ✅ Works         |
-| Chromium PPA           | ✅ Works         |
-| Firefox snap           | ❌ Blocked       |
-| Firefox .deb           | ✅ Works         |
-
-## 🧪 Testing
-
-### Test Native Host Directly
-
+### Diagnostics
 ```bash
-# Test ping
-echo '{"action":"ping"}' | ~/bin/ccs-host
+./scripts/diagnose.sh
+```
+Checks:
+- Rust installation
+- Native host binary location
+- Native messaging manifest registration
+- Extension load status
 
-# Test save (manual)
-cat > /tmp/test-save.py << 'EOF'
-import subprocess
-import struct
-import json
-
-msg = {"action": "save", "path": "/tmp/test-ccs.txt", "content": "Hello from CCS!"}
-encoded = json.dumps(msg).encode('utf-8')
-
-proc = subprocess.Popen(
-    ['ccs-host'],
-    stdin=subprocess.PIPE,
-    stdout=subprocess.PIPE
-)
-
-# Write length + message
-proc.stdin.write(struct.pack('I', len(encoded)))
-proc.stdin.write(encoded)
-proc.stdin.flush()
-
-# Read response
-length = struct.unpack('I', proc.stdout.read(4))[0]
-response = json.loads(proc.stdout.read(length))
-print(response)
-EOF
-
-python3 /tmp/test-save.py
-cat /tmp/test-ccs.txt
+### Project Structure
+```
+.
+├── extension/
+│   ├── manifest.json       # Manifest V3 config
+│   ├── content.js          # Injects save button, detects filenames
+│   ├── background.js       # Native messaging bridge
+│   ├── popup.html          # Project management UI
+│   ├── popup.js            # CRUD logic for projects
+│   └── styles.css          # Modal and popup styles
+├── native-host/
+│   ├── Cargo.toml          # Rust dependencies (serde, serde_json)
+│   └── src/
+│       └── main.rs         # Native messaging protocol handler
+├── scripts/
+│   ├── install.sh          # Build and install native host
+│   └── diagnose.sh         # System diagnostic checks
+├── test/
+│   └── content-test.html   # Filename detection test page
+└── README.md               # This file
 ```
 
-### Test Extension
-
-1. Open DevTools on a Copilot Studio page (F12)
-2. Check Console for `[Copilot Code Saver] Loaded v0.4.0`
-3. Check extension popup for "Native host connected" status
-4. Try saving a code block — verify filename detection works
-
-## 🔄 Migration from v0.3.x
-
-If you're upgrading from v0.3.x (which used `projects.toml`):
-
-1. **Rebuild native host** — The new version is simpler and has fewer dependencies
-2. **Add projects via popup** — Projects are now stored in Chrome, not a config file
-3. **Optional: Import old config** — Manually recreate projects in the popup, or create a JSON file:
-
-```json
-{
-  "version": "0.4.0",
-  "defaultProject": "my-app",
-  "projects": [
-    { "id": "my-app", "name": "My Application", "root": "/home/user/prj/my-app" },
-    { "id": "dotfiles", "name": "Dotfiles", "root": "/home/user/.dotfiles" }
-  ]
-}
+### Building Manually
+```bash
+cd native-host
+cargo build --release
+# Binary: target/release/ccs-host
 ```
 
-Then use "Import" in the extension popup.
+### Debugging Native Host
+**Enable logging** (optional):
+```rust
+// In native-host/src/main.rs, add:
+eprintln!("Received request: {:?}", request);
+```
+Stderr logs appear in:
+```bash
+journalctl --user -u chrome  # systemd
+~/.xsession-errors            # X11
+```
 
-## 🚧 Future Enhancements
+---
 
-- [ ] Keyboard shortcuts (Ctrl+Shift+S)
-- [ ] "Open in editor" after save (configurable command)
-- [ ] File tree browser in modal
-- [ ] Git integration (branch awareness)
-- [ ] Support more AI chat platforms
-- [ ] Publish to Chrome Web Store
-- [ ] Learn from user corrections (ML-based filename prediction)
+## Future Enhancements
 
-## 📄 License
+Planned features (not yet implemented):
+- ⌨️ **Keyboard Shortcuts** — Quick-save, quick-append, quick-open-in-editor
+- 🔧 **Editor Integration** — Configurable "open in editor" command after save
+- 🌿 **Git Awareness** — Warn on dirty workspace, branch hints, optional auto-commit
+- 📦 **Batch Operations** — Save multiple blocks atomically as a change set
+- 🔍 **Dry-Run Mode** — Preview writes without touching disk
+- 🏪 **Chrome Web Store** — One-click installation
 
-MIT
+**Contributions welcome!** Open an issue or PR on GitHub.
 
-## 🙏 Credits
+---
 
-Built during a pair-programming session with AI assistance, solving the real problem of "copy-paste hell" when using web-based AI coding assistants without API access.
+## License
+
+*(Add your license here, e.g., MIT, Apache-2.0)*
+
+---
+
+## Support
+
+**Issues?** Run diagnostics first:
+```bash
+./scripts/diagnose.sh
+```
+
+**Questions?** Open an issue or contact the maintainer.
+
+---
+
+**Version:** 0.4.0  
+**Last Updated:** 2026-02-15

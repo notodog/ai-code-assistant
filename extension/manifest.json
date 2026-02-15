@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI Code Assistant",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "Bridge AI-generated code directly into your development workflow",
   "permissions": ["activeTab", "storage", "nativeMessaging"],
   "background": {
@@ -15,7 +15,8 @@
     {
       "matches": [
         "https://copilotstudio.microsoft.com/*",
-        "https://*.powerva.microsoft.com/*"
+        "https://*.powerva.microsoft.com/*",
+        "https://chatgpt.com/*"
       ],
       "js": ["content.js"],
       "css": ["styles.css"],

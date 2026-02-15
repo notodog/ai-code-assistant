@@ -518,6 +518,18 @@
     return `${cleanRoot}/${cleanRelative}`;
   }
 
+  // ============ SHELL DETECTION ============
+
+  function isShellScript(code, ext) {
+    // Check extension
+    if (ext === 'sh') return true;
+
+    // Check shebang
+    if (/^#!\/(bin|usr\/bin)\/(bash|sh|zsh)/.test(code.trim())) return true;
+
+    return false;
+  }
+
   // ============ MODAL ============
 
   async function showSaveModal(code, detectedInfo, onSave, onCancel) {
@@ -658,92 +670,257 @@
     });
   }
 
-  // ============ BUTTON INJECTION ============
+  // ============ EXECUTE MODAL ============
+  
+  async function showExecuteModal(code, detectedInfo, onExecute, onCancel) {
+    const { projects, default: defaultProject, error } = await listProjects();
+  
+    if (error || projects.length === 0) {
+      alert(`AI Code Assistant: ${error || 'No projects configured'}\n\nClick the extension icon to add projects.`);
+      onCancel();
+      return;
+    }
+  
+    const overlay = document.createElement('div');
+    overlay.className = 'aic-modal-overlay';
+  
+    chrome.storage.sync.get(['lastProject'], async (stored) => {
+      const selectedProjectId = stored.lastProject || defaultProject || projects[0]?.id;
+      const selectedProject = projects.find(p => p.id === selectedProjectId);
+      const workdir = selectedProject?.path || '/tmp';
+  
+      const projectOptions = projects.map(p =>
+        `<option value="${p.id}" ${p.id === selectedProjectId ? 'selected' : ''}>${p.name}</option>`
+      ).join('');
+  
+      const preview = code.length > 500 ? code.substring(0, 500) + '\n...(truncated)' : code;
+      const lineCount = code.split('\n').length;
+  
+      overlay.innerHTML = `
+        <div class="aic-modal">
+          <h3>⚡ Execute Shell Script</h3>
+          
+          <label>Project (for working directory):</label>
+          <select id="aic-exec-project">${projectOptions}</select>
+          
+          <label>Working Directory:</label>
+          <input type="text" id="aic-exec-workdir" value="${workdir}" />
+          
+          <label>Script Preview (${lineCount} lines):</label>
+          <pre class="aic-exec-preview">${preview}</pre>
+          
+          <label>Timeout (seconds):</label>
+          <input type="number" id="aic-exec-timeout" value="30" min="1" max="300" />
+          
+          <div class="aic-modal-buttons">
+            <button id="aic-execute" class="aic-modal-btn primary">▶️ Execute</button>
+            <button id="aic-cancel" class="aic-modal-btn secondary">Cancel</button>
+          </div>
+          
+          <div id="aic-exec-output" style="display:none; margin-top: 16px; border-top: 2px solid #ddd; padding-top: 16px;">
+            <h4 style="margin: 0 0 8px 0;">Output:</h4>
+            <pre id="aic-stdout" class="aic-stdout"></pre>
+            <pre id="aic-stderr" class="aic-stderr"></pre>
+            <div id="aic-status" class="aic-status"></div>
+          </div>
+        </div>
+      `;
+  
+      document.body.appendChild(overlay);
+  
+      // Update workdir when project changes
+      overlay.querySelector('#aic-exec-project').addEventListener('change', (e) => {
+        const proj = projects.find(p => p.id === e.target.value);
+        if (proj) {
+          overlay.querySelector('#aic-exec-workdir').value = proj.path;
+        }
+      });
+  
+      // Execute button
+      overlay.querySelector('#aic-execute').addEventListener('click', async () => {
+        const workdir = overlay.querySelector('#aic-exec-workdir').value;
+        const timeout = parseInt(overlay.querySelector('#aic-exec-timeout').value);
+        const btn = overlay.querySelector('#aic-execute');
+        
+        btn.disabled = true;
+        btn.textContent = '⏳ Executing...';
+  
+        try {
+          const response = await sendNativeMessage({
+            action: 'execute',
+            code: code,
+            workdir: workdir,
+            timeout: timeout
+          });
+  
+          // Show output section
+          const outputDiv = overlay.querySelector('#aic-exec-output');
+          outputDiv.style.display = 'block';
+  
+          const stdoutEl = overlay.querySelector('#aic-stdout');
+          const stderrEl = overlay.querySelector('#aic-stderr');
+          const statusEl = overlay.querySelector('#aic-status');
+  
+          stdoutEl.textContent = response.stdout || '(no output)';
+          stderrEl.textContent = response.stderr || '';
+          stderrEl.style.display = response.stderr ? 'block' : 'none';
+  
+          if (response.success) {
+            statusEl.innerHTML = `✅ Exit code: ${response.exit_code || 0}`;
+            statusEl.className = 'aic-status success';
+            btn.textContent = '✓ Executed';
+            onExecute();
+          } else {
+            statusEl.innerHTML = `❌ ${response.error || 'Execution failed'} (exit code: ${response.exit_code || 'unknown'})`;
+            statusEl.className = 'aic-status error';
+            btn.disabled = false;
+            btn.textContent = '▶️ Retry';
+          }
+        } catch (error) {
+          alert('Execution failed: ' + error.message);
+          btn.disabled = false;
+          btn.textContent = '▶️ Execute';
+        }
+      });
+  
+      // Cancel button
+      overlay.querySelector('#aic-cancel').addEventListener('click', () => {
+        overlay.remove();
+        onCancel();
+      });
+  
+      // ESC to close
+      overlay.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          overlay.remove();
+          onCancel();
+        }
+      });
+  
+      // Click overlay to close
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          overlay.remove();
+          onCancel();
+        }
+      });
+    });
+  }
 
+  // ============ BUTTON INJECTION ============
+  
   function injectButton(preElement, index) {
     if (preElement.hasAttribute(PROCESSED_ATTR)) return;
     preElement.setAttribute(PROCESSED_ATTR, 'true');
-
+  
     const codeEl = preElement.querySelector('code') || preElement;
     const code = codeEl.textContent || '';
-
+  
     const wrapper = document.createElement('div');
     wrapper.style.cssText = 'position: relative; display: inline-block; width: 100%;';
     preElement.parentNode.insertBefore(wrapper, preElement);
     wrapper.appendChild(preElement);
-
+  
+    // Detect language and check if shell
+    const ext = detectLanguage(codeEl);
+    const isShell = isShellScript(code, ext);
+  
     const btn = document.createElement('button');
-    btn.innerHTML = ICONS.save;
-    btn.title = 'Save to project';
+    btn.innerHTML = isShell ? '▶️' : ICONS.save;
+    btn.title = isShell ? 'Execute shell script' : 'Save to project';
     btn.style.cssText = `
       position: absolute;
       bottom: 10px;
       right: 10px;
       display: flex;
       align-items: center;
-      justify-content: center;
-      width: 28px;
-      height: 28px;
-      padding: 0;
-      margin: 0;
-      background: rgba(255, 255, 255, 0.95);
-      border: 1px solid rgba(0, 0, 0, 0.15);
+      gap: 6px;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(0, 0, 0, 0.1);
       border-radius: 6px;
       cursor: pointer;
-      color: #444;
-      transition: all 0.15s ease;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
-      z-index: 10000;
+      font-size: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #333;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      transition: all 0.2s;
+      z-index: 10;
     `;
-
+  
     btn.addEventListener('mouseenter', () => {
-      btn.style.background = '#0078d4';
-      btn.style.color = 'white';
-      btn.style.borderColor = '#0078d4';
+      btn.style.background = 'rgba(255, 255, 255, 1)';
+      btn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
     });
-
+  
     btn.addEventListener('mouseleave', () => {
-      btn.style.background = 'rgba(255, 255, 255, 0.95)';
-      btn.style.color = '#444';
-      btn.style.borderColor = 'rgba(0, 0, 0, 0.15)';
+      btn.style.background = 'rgba(255, 255, 255, 0.9)';
+      btn.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
     });
-
+  
+    btn.addEventListener('mousedown', () => {
+      btn.style.transform = 'scale(0.95)';
+    });
+  
+    btn.addEventListener('mouseup', () => {
+      btn.style.transform = 'scale(1)';
+    });
+  
     btn.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
-
-      const ext = detectLanguage(codeEl);
-      
-      // Use smart detection
-      const detected = FilenameDetector.detect(preElement, code, ext);
-
-      const detectedInfo = {
-        filename: detected.filename,
-        source: detected.source,
-        confidence: detected.confidence,
-        ext: ext
-      };
-
-      showSaveModal(code, detectedInfo,
-        async (absolutePath) => {
-          const result = await saveFile(absolutePath, code);
-          if (result.success) {
-            btn.innerHTML = ICONS.check;
-            btn.title = `Saved to ${result.full_path}`;
-          } else {
-            btn.innerHTML = ICONS.error;
-            btn.title = `Error: ${result.error}`;
-            alert(`Save failed: ${result.error}`);
+  
+      if (isShell) {
+        // Execute mode for shell scripts
+        const detected = FilenameDetector.detect(preElement, code, ext);
+        showExecuteModal(code, detected,
+          () => {
+            // Success callback
+            btn.innerHTML = '✓';
+            btn.title = 'Executed successfully';
+            setTimeout(() => {
+              btn.innerHTML = '▶️';
+              btn.title = 'Execute shell script';
+            }, 2000);
+          },
+          () => {
+            // Cancel callback - do nothing
           }
-          setTimeout(() => {
-            btn.innerHTML = ICONS.save;
-            btn.title = 'Save to project';
-          }, 2000);
-        },
-        () => {}
-      );
+        );
+      } else {
+        // Save mode for regular code
+        const detected = FilenameDetector.detect(preElement, code, ext);
+  
+        const detectedInfo = {
+          filename: detected.filename,
+          source: detected.source,
+          confidence: detected.confidence,
+          ext: ext
+        };
+  
+        showSaveModal(code, detectedInfo,
+          async (absolutePath) => {
+            const result = await saveFile(absolutePath, code);
+            if (result.success) {
+              btn.innerHTML = ICONS.check;
+              btn.title = `Saved to ${result.full_path}`;
+            } else {
+              btn.innerHTML = ICONS.error;
+              btn.title = `Error: ${result.error}`;
+              alert(`Save failed: ${result.error}`);
+            }
+            setTimeout(() => {
+              btn.innerHTML = ICONS.save;
+              btn.title = 'Save to project';
+            }, 2000);
+          },
+          () => {
+            // Cancel callback - do nothing
+          }
+        );
+      }
     });
-
+  
     wrapper.appendChild(btn);
   }
 
@@ -757,5 +934,5 @@
   processCodeBlocks();
   observer.observe(document.body, { childList: true, subtree: true });
 
-  console.log('[AI Code Assistant] Loaded v0.1.0');
+  console.log('[AI Code Assistant] Loaded v0.4.0');
 })();
