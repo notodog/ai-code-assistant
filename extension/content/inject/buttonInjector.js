@@ -23,6 +23,8 @@
       transition: all 0.2s;
       z-index: 10;
     `;
+    btn.style.lineHeight = '1';
+    btn.style.justifyContent = 'center';
     btn.addEventListener('mouseenter', () => {
       btn.style.background = 'rgba(255, 255, 255, 1)';
       btn.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
@@ -55,7 +57,7 @@
       const isShell = AIC.Shell.isShellScript(code, ext);
 
       const btn = document.createElement('button');
-      btn.innerHTML = isShell ? '▶️' : AIC.ICONS.save;
+      btn.innerHTML = isShell ? AIC.ICONS.exec : AIC.ICONS.save;
       btn.title = isShell ? 'Execute shell script' : 'Save to project';
 
       styleButton(btn);
@@ -72,7 +74,7 @@
             () => {
               btn.innerHTML = '✓';
               btn.title = 'Executed successfully';
-              setTimeout(() => { btn.innerHTML = '▶️'; btn.title = 'Execute shell script'; }, 2000);
+              setTimeout(() => { btn.innerHTML = AIC.ICONS.exec; btn.title = 'Execute shell script'; }, 2000);
             },
             () => {}
           );
