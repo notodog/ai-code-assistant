@@ -11,29 +11,51 @@
     "https://gemini.google.com/*",
     "https://copilotstudio.microsoft.com/*",
     "https://copilot.microsoft.com/*",
-    "https://m365.cloud.microsoft/*",
+    "https://m365.cloud.microsoft//*",
     "https://*.bing.com/*"
   ],
-  "background": {
-    "service_worker": "background.js"
-  },
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "AI Code Assistant"
-  },
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "AI Code Assistant" },
   "content_scripts": [
     {
-    "matches": [
-      "https://chat.openai.com/*",
-      "https://chatgpt.com/*",
-      "https://claude.ai/*",
-      "https://gemini.google.com/*",
-      "https://copilotstudio.microsoft.com/*",
-      "https://copilot.microsoft.com/*",
-      "https://m365.cloud.microsoft/*",
-      "https://*.bing.com/chat*"
-    ],
-      "js": ["content.js"],
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilotstudio.microsoft.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://m365.cloud.microsoft/*",
+        "https://*.bing.com/chat*"
+      ],
+      "js": [
+        "content/aic.js",
+
+        "content/utils/dom.js",
+        "content/utils/path.js",
+        "content/utils/clipboard.js",
+        "content/utils/toast.js",
+
+        "content/native.js",
+
+        "content/storage/projects.js",
+        "content/storage/recentPaths.js",
+
+        "content/detection/language.js",
+        "content/detection/shell.js",
+        "content/detection/filenameDetector.js",
+
+        "content/platform/detectPlatform.js",
+        "content/platform/insert.js",
+
+        "content/ui/saveModal.js",
+        "content/ui/executeModal.js",
+
+        "content/inject/buttonInjector.js",
+        "content/inject/processor.js",
+
+        "content.js"
+      ],
       "css": ["styles.css"],
       "run_at": "document_idle"
     }
