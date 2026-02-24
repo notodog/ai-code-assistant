@@ -1,6 +1,6 @@
 # AI Code Assistant: Complete Architecture & Flow Documentation
 
-**Version:** 0.4.0  
+**Version:** 0.4.0
 **Date:** February 15, 2026  
 **Purpose:** Comprehensive technical reference for developers maintaining and extending the AI Code Assistant browser extension + Rust native host toolchain.
 
